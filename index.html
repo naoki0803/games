@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>子供向けゲームコレクション</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <h1>🎮 子供向けゲームコレクション</h1>
+        
+        <!-- ゲーム選択メニュー -->
+        <div id="gameMenu" class="game-menu">
+            <h2>ゲームを選んでください</h2>
+            <div class="game-buttons">
+                <button class="game-btn" onclick="startGame('breakout')">
+                    🧱 ブロック崩し
+                </button>
+                <button class="game-btn" onclick="startGame('snake')" disabled>
+                    🐍 スネーク（準備中）
+                </button>
+                <button class="game-btn" onclick="startGame('tetris')" disabled>
+                    🟦 テトリス（準備中）
+                </button>
+                <button class="game-btn" onclick="startGame('pong')" disabled>
+                    🏓 ポン（準備中）
+                </button>
+            </div>
+        </div>
+
+        <!-- ゲーム画面 -->
+        <div id="gameScreen" class="game-screen hidden">
+            <div class="game-header">
+                <h2 id="gameTitle">ブロック崩し</h2>
+                <div class="game-controls">
+                    <button onclick="pauseGame()">⏸️ 一時停止</button>
+                    <button onclick="backToMenu()">🏠 メニューに戻る</button>
+                </div>
+            </div>
+            
+            <div class="game-info">
+                <div class="score">スコア: <span id="score">0</span></div>
+                <div class="lives">残り: <span id="lives">3</span></div>
+                <div class="level">レベル: <span id="level">1</span></div>
+            </div>
+            
+            <canvas id="gameCanvas" width="800" height="600"></canvas>
+            
+            <div class="game-instructions">
+                <p>← → キーでパドルを動かしてボールを跳ね返そう！</p>
+                <p>すべてのブロックを壊してクリアしよう！</p>
+            </div>
+        </div>
+
+        <!-- ゲームオーバー画面 -->
+        <div id="gameOverScreen" class="game-over hidden">
+            <div class="game-over-content">
+                <h2 id="gameOverTitle">ゲームオーバー</h2>
+                <div class="final-score">
+                    最終スコア: <span id="finalScore">0</span>
+                </div>
+                <div class="game-over-buttons">
+                    <button onclick="restartGame()">🔄 もう一度</button>
+                    <button onclick="backToMenu()">🏠 メニューに戻る</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="games.js"></script>
+</body>
+</html>
