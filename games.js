@@ -608,12 +608,14 @@ function startGame(gameType) {
         console.error('GameManager not initialized yet');
         return;
     }
+    
     gameManager.showScreen('gameScreen');
     
     switch (gameType) {
         case 'breakout':
             gameManager.currentGame = new BreakoutGame(gameManager);
             document.getElementById('gameTitle').textContent = 'ブロック崩し';
+            gameManager.currentGame.startGame();
             break;
         default:
             alert('このゲームはまだ準備中です！');
@@ -653,6 +655,7 @@ function restartGame() {
         gameManager.currentGame.initializeGame();
         gameManager.showScreen('gameScreen');
         gameManager.gameState = 'playing';
+        gameManager.currentGame.startGame();
     }
 }
 
