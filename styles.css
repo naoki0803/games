@@ -13,6 +13,11 @@ body {
     justify-content: center;
     align-items: center;
     color: white;
+    overflow: hidden;
+    position: fixed;
+    width: 100%;
+    height: 100%;
+    touch-action: none;
 }
 
 .container {
@@ -20,6 +25,9 @@ body {
     padding: 20px;
     max-width: 900px;
     width: 100%;
+    height: 100%;
+    overflow: auto;
+    -webkit-overflow-scrolling: touch;
 }
 
 h1 {
@@ -148,6 +156,10 @@ h1 {
     box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
     max-width: 100%;
     height: auto;
+    touch-action: none;
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    user-select: none;
 }
 
 .game-instructions {
@@ -252,9 +264,9 @@ h1 {
     }
     
     #gameCanvas {
-        width: 100%;
-        max-width: 400px;
-        height: 300px;
+        width: 100% !important;
+        max-width: 100% !important;
+        height: auto !important;
     }
     
     .game-over-buttons {
@@ -277,4 +289,18 @@ h1 {
 button:focus {
     outline: 3px solid #f39c12;
     outline-offset: 2px;
+}
+
+/* モバイル/デスクトップ表示切り替え */
+.mobile-instructions {
+    display: none;
+}
+
+@media (max-width: 768px) {
+    .desktop-instructions {
+        display: none;
+    }
+    .mobile-instructions {
+        display: block;
+    }
 }

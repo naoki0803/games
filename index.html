@@ -2,7 +2,9 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <title>子供向けゲームコレクション</title>
     <link rel="stylesheet" href="styles.css">
 </head>
@@ -48,7 +50,8 @@
             <canvas id="gameCanvas" width="800" height="600"></canvas>
             
             <div class="game-instructions">
-                <p>← → キーでパドルを動かしてボールを跳ね返そう！</p>
+                <p class="desktop-instructions">← → キーでパドルを動かしてボールを跳ね返そう！</p>
+                <p class="mobile-instructions">画面をタッチしてパドルを動かそう！</p>
                 <p>すべてのブロックを壊してクリアしよう！</p>
             </div>
         </div>
