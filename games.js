@@ -189,6 +189,7 @@ class BreakoutGame {
         this.touchX = null;
         this.targetPaddleX = null;
         this.paddleVelocity = 0;
+        this.autoStart = false; // 自動開始フラグ
         
         this.initializeGame();
     }
@@ -333,12 +334,18 @@ class BreakoutGame {
     }
 
     startGame() {
+        console.log('BreakoutGame.startGame() called');
         this.gameRunning = true;
+        // ゲーム開始時にボールをリセット
+        this.resetBall();
         this.gameLoop();
     }
 
     gameLoop() {
-        if (!this.gameRunning) return;
+        if (!this.gameRunning) {
+            console.log('gameLoop stopped - gameRunning is false');
+            return;
+        }
         
         this.update();
         this.draw();
@@ -496,8 +503,8 @@ class BreakoutGame {
         // ブロックを描画
         this.drawBlocks();
         
-        // ゲーム開始前のメッセージ
-        if (!this.gameRunning) {
+        // ゲーム開始前のメッセージ（autoStartの場合は表示しない）
+        if (!this.gameRunning && !this.autoStart) {
             this.drawStartMessage();
         }
     }
@@ -615,7 +622,13 @@ function startGame(gameType) {
         case 'breakout':
             gameManager.currentGame = new BreakoutGame(gameManager);
             document.getElementById('gameTitle').textContent = 'ブロック崩し';
-            gameManager.currentGame.startGame();
+            // 自動的にゲームを開始（開始メッセージを表示しない）
+            gameManager.currentGame.autoStart = true;
+            setTimeout(() => {
+                if (gameManager.currentGame) {
+                    gameManager.currentGame.startGame();
+                }
+            }, 100);
             break;
         default:
             alert('このゲームはまだ準備中です！');
