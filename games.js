@@ -515,6 +515,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
 // ゲーム制御関数
 function startGame(gameType) {
+    if (!gameManager) {
+        console.error('GameManager not initialized yet');
+        return;
+    }
     gameManager.showScreen('gameScreen');
     
     switch (gameType) {
@@ -532,6 +536,7 @@ function startGame(gameType) {
 }
 
 function pauseGame() {
+    if (!gameManager) return;
     if (gameManager.currentGame && gameManager.currentGame.gameRunning) {
         gameManager.currentGame.gameRunning = false;
         gameManager.gameState = 'paused';
@@ -554,6 +559,7 @@ function pauseGame() {
 }
 
 function restartGame() {
+    if (!gameManager) return;
     if (gameManager.currentGame) {
         gameManager.currentGame.initializeGame();
         gameManager.showScreen('gameScreen');
@@ -562,6 +568,7 @@ function restartGame() {
 }
 
 function backToMenu() {
+    if (!gameManager) return;
     if (gameManager.currentGame) {
         gameManager.currentGame.gameRunning = false;
     }
@@ -570,13 +577,21 @@ function backToMenu() {
     gameManager.showScreen('gameMenu');
 }
 
+// GameManagerのインスタンスを作成
+let gameManager;
+
+// ページが読み込まれたらゲームマネージャーを初期化
+document.addEventListener('DOMContentLoaded', () => {
+    gameManager = new GameManager();
+});
+
 // 追加のキーボードイベント
 document.addEventListener('keydown', (e) => {
-    if (e.key === ' ' && gameManager.gameState === 'paused') {
+    if (gameManager && e.key === ' ' && gameManager.gameState === 'paused') {
         e.preventDefault();
         pauseGame();
     }
-    if (e.key === 'Escape') {
+    if (gameManager && e.key === 'Escape') {
         if (gameManager.gameState === 'playing') {
             pauseGame();
         }
