@@ -8,6 +8,38 @@ class GameManager {
         this.setupEventListeners();
         this.audioContext = null;
         this.initAudio();
+        this.resizeCanvas();
+        window.addEventListener('resize', () => this.resizeCanvas());
+    }
+
+    resizeCanvas() {
+        const maxWidth = 800;
+        const maxHeight = 600;
+        const aspectRatio = maxWidth / maxHeight;
+        
+        let width = window.innerWidth * 0.9;
+        let height = window.innerHeight * 0.7;
+        
+        // アスペクト比を維持
+        if (width / height > aspectRatio) {
+            width = height * aspectRatio;
+        } else {
+            height = width / aspectRatio;
+        }
+        
+        // 最大サイズを超えないように制限
+        if (width > maxWidth) {
+            width = maxWidth;
+            height = maxHeight;
+        }
+        
+        this.canvas.width = width;
+        this.canvas.height = height;
+        
+        // ゲームが実行中の場合はリサイズを通知
+        if (this.currentGame && this.currentGame.handleResize) {
+            this.currentGame.handleResize();
+        }
     }
 
     initAudio() {
@@ -64,6 +96,17 @@ class GameManager {
                 this.currentGame.handleTouchMove(e);
             }
         });
+
+        this.canvas.addEventListener('touchend', (e) => {
+            e.preventDefault();
+        });
+
+        // iOSでのスクロール防止
+        document.addEventListener('touchmove', (e) => {
+            if (e.target === this.canvas) {
+                e.preventDefault();
+            }
+        }, { passive: false });
     }
 
     showScreen(screenName) {
@@ -94,13 +137,16 @@ class BreakoutGame {
     }
 
     initializeGame() {
+        // スケール比率を計算
+        this.scale = Math.min(this.width / 800, this.height / 600);
+        
         // パドル設定
         this.paddle = {
-            x: this.width / 2 - 60,
-            y: this.height - 30,
-            width: 120,
-            height: 15,
-            speed: 8,
+            x: this.width / 2 - 60 * this.scale,
+            y: this.height - 30 * this.scale,
+            width: 120 * this.scale,
+            height: 15 * this.scale,
+            speed: 8 * this.scale,
             color: '#ff6b6b'
         };
 
@@ -108,9 +154,9 @@ class BreakoutGame {
         this.ball = {
             x: this.width / 2,
             y: this.height / 2,
-            radius: 8,
-            speedX: 5,
-            speedY: -5,
+            radius: 8 * this.scale,
+            speedX: 5 * this.scale,
+            speedY: -5 * this.scale,
             color: '#4ecdc4'
         };
 
@@ -121,11 +167,11 @@ class BreakoutGame {
 
     createBlocks() {
         this.blocks = [];
-        const blockWidth = 70;
-        const blockHeight = 25;
-        const blockPadding = 5;
-        const blockOffsetTop = 80;
-        const blockOffsetLeft = 35;
+        const blockWidth = 70 * this.scale;
+        const blockHeight = 25 * this.scale;
+        const blockPadding = 5 * this.scale;
+        const blockOffsetTop = 80 * this.scale;
+        const blockOffsetLeft = 35 * this.scale;
         
         const blockRows = 5 + Math.floor(this.level / 2);
         const blockCols = 10;
@@ -162,6 +208,12 @@ class BreakoutGame {
     }
 
     handleTouch(e) {
+        // ゲームがまだ開始されていない場合は開始
+        if (!this.gameRunning) {
+            this.startGame();
+            return;
+        }
+        
         const rect = this.canvas.getBoundingClientRect();
         const touch = e.touches[0];
         const x = touch.clientX - rect.left;
@@ -172,6 +224,39 @@ class BreakoutGame {
 
     handleTouchMove(e) {
         this.handleTouch(e);
+    }
+
+    handleResize() {
+        // キャンバスサイズを更新
+        this.width = this.canvas.width;
+        this.height = this.canvas.height;
+        
+        // スケール比率を再計算
+        const oldScale = this.scale;
+        this.scale = Math.min(this.width / 800, this.height / 600);
+        const scaleRatio = this.scale / oldScale;
+        
+        // パドル位置とサイズを調整
+        this.paddle.x *= scaleRatio;
+        this.paddle.y = this.height - 30 * this.scale;
+        this.paddle.width *= scaleRatio;
+        this.paddle.height *= scaleRatio;
+        this.paddle.speed *= scaleRatio;
+        
+        // ボール位置とサイズを調整
+        this.ball.x *= scaleRatio;
+        this.ball.y *= scaleRatio;
+        this.ball.radius *= scaleRatio;
+        this.ball.speedX *= scaleRatio;
+        this.ball.speedY *= scaleRatio;
+        
+        // ブロック位置とサイズを調整
+        this.blocks.forEach(block => {
+            block.x *= scaleRatio;
+            block.y *= scaleRatio;
+            block.width *= scaleRatio;
+            block.height *= scaleRatio;
+        });
     }
 
     startGame() {
