@@ -5,6 +5,8 @@ class GameManager {
         this.gameState = 'menu'; // menu, playing, paused, gameOver
         this.canvas = document.getElementById('gameCanvas');
         this.ctx = this.canvas.getContext('2d');
+        this.touchStartX = null;
+        this.touchCurrentX = null;
         this.setupEventListeners();
         this.audioContext = null;
         this.initAudio();
@@ -85,27 +87,79 @@ class GameManager {
         // タッチ操作のサポート
         this.canvas.addEventListener('touchstart', (e) => {
             e.preventDefault();
+            const touch = e.touches[0];
+            this.touchStartX = touch.clientX;
+            this.touchCurrentX = touch.clientX;
             if (this.currentGame) {
                 this.currentGame.handleTouch(e);
             }
-        });
+        }, { passive: false });
 
         this.canvas.addEventListener('touchmove', (e) => {
             e.preventDefault();
-            if (this.currentGame) {
-                this.currentGame.handleTouchMove(e);
+            if (e.touches.length > 0) {
+                const touch = e.touches[0];
+                this.touchCurrentX = touch.clientX;
+                if (this.currentGame) {
+                    this.currentGame.handleTouchMove(e);
+                }
             }
-        });
+        }, { passive: false });
 
         this.canvas.addEventListener('touchend', (e) => {
             e.preventDefault();
+            this.touchStartX = null;
+            this.touchCurrentX = null;
+            if (this.currentGame) {
+                this.currentGame.handleTouchEnd(e);
+            }
+        }, { passive: false });
+
+        // マウス操作のサポート（デバッグ用）
+        let mouseDown = false;
+        this.canvas.addEventListener('mousedown', (e) => {
+            mouseDown = true;
+            if (this.currentGame) {
+                const fakeTouch = {
+                    touches: [{ clientX: e.clientX, clientY: e.clientY }],
+                    preventDefault: () => {}
+                };
+                this.currentGame.handleTouch(fakeTouch);
+            }
+        });
+
+        this.canvas.addEventListener('mousemove', (e) => {
+            if (mouseDown && this.currentGame) {
+                const fakeTouch = {
+                    touches: [{ clientX: e.clientX, clientY: e.clientY }],
+                    preventDefault: () => {}
+                };
+                this.currentGame.handleTouchMove(fakeTouch);
+            }
+        });
+
+        this.canvas.addEventListener('mouseup', (e) => {
+            mouseDown = false;
+            if (this.currentGame) {
+                this.currentGame.handleTouchEnd(e);
+            }
         });
 
         // iOSでのスクロール防止
         document.addEventListener('touchmove', (e) => {
-            if (e.target === this.canvas) {
+            if (e.target === this.canvas || e.target.closest('#gameScreen')) {
                 e.preventDefault();
             }
+        }, { passive: false });
+
+        // iOSでのダブルタップズーム防止
+        let lastTouchEnd = 0;
+        document.addEventListener('touchend', (e) => {
+            const now = Date.now();
+            if (now - lastTouchEnd <= 300) {
+                e.preventDefault();
+            }
+            lastTouchEnd = now;
         }, { passive: false });
     }
 
@@ -132,6 +186,9 @@ class BreakoutGame {
         this.level = 1;
         this.gameRunning = false;
         this.keys = {};
+        this.touchX = null;
+        this.targetPaddleX = null;
+        this.paddleVelocity = 0;
         
         this.initializeGame();
     }
@@ -214,16 +271,32 @@ class BreakoutGame {
             return;
         }
         
-        const rect = this.canvas.getBoundingClientRect();
-        const touch = e.touches[0];
-        const x = touch.clientX - rect.left;
-        
-        this.paddle.x = x - this.paddle.width / 2;
-        this.paddle.x = Math.max(0, Math.min(this.width - this.paddle.width, this.paddle.x));
+        if (e.touches && e.touches.length > 0) {
+            const rect = this.canvas.getBoundingClientRect();
+            const touch = e.touches[0];
+            const x = (touch.clientX - rect.left) * (this.canvas.width / rect.width);
+            
+            this.touchX = x;
+            this.targetPaddleX = x - this.paddle.width / 2;
+        }
     }
 
     handleTouchMove(e) {
-        this.handleTouch(e);
+        if (!this.gameRunning) return;
+        
+        if (e.touches && e.touches.length > 0) {
+            const rect = this.canvas.getBoundingClientRect();
+            const touch = e.touches[0];
+            const x = (touch.clientX - rect.left) * (this.canvas.width / rect.width);
+            
+            this.touchX = x;
+            this.targetPaddleX = x - this.paddle.width / 2;
+        }
+    }
+
+    handleTouchEnd(e) {
+        // タッチ終了時の処理
+        this.touchX = null;
     }
 
     handleResize() {
@@ -274,12 +347,21 @@ class BreakoutGame {
     }
 
     update() {
-        // パドルの移動
+        // タッチ操作によるパドル移動（スムーズな追従）
+        if (this.targetPaddleX !== null) {
+            const diff = this.targetPaddleX - this.paddle.x;
+            const smoothingFactor = 0.2; // 追従の滑らかさ（0-1の間、大きいほど速く追従）
+            this.paddle.x += diff * smoothingFactor;
+        }
+        
+        // キーボード操作によるパドルの移動
         if (this.keys['ArrowLeft'] || this.keys['a'] || this.keys['A']) {
             this.paddle.x -= this.paddle.speed;
+            this.targetPaddleX = null; // キーボード操作時はタッチ操作を無効化
         }
         if (this.keys['ArrowRight'] || this.keys['d'] || this.keys['D']) {
             this.paddle.x += this.paddle.speed;
+            this.targetPaddleX = null; // キーボード操作時はタッチ操作を無効化
         }
         
         // パドルの境界チェック
@@ -367,8 +449,8 @@ class BreakoutGame {
     resetBall() {
         this.ball.x = this.width / 2;
         this.ball.y = this.height / 2;
-        this.ball.speedX = 5 * (Math.random() > 0.5 ? 1 : -1);
-        this.ball.speedY = -5;
+        this.ball.speedX = 5 * this.scale * (Math.random() > 0.5 ? 1 : -1);
+        this.ball.speedY = -5 * this.scale;
     }
 
     levelUp() {
@@ -485,10 +567,17 @@ class BreakoutGame {
         this.ctx.fillStyle = '#fff';
         this.ctx.font = '24px Arial';
         this.ctx.textAlign = 'center';
-        this.ctx.fillText('スペースキーまたはEnterでゲーム開始！', this.width / 2, this.height / 2);
+        const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
         
-        this.ctx.font = '18px Arial';
-        this.ctx.fillText('←→キーでパドルを動かそう！', this.width / 2, this.height / 2 + 40);
+        if (isMobile) {
+            this.ctx.fillText('画面をタップしてゲーム開始！', this.width / 2, this.height / 2);
+            this.ctx.font = '18px Arial';
+            this.ctx.fillText('タップ＆ドラッグでパドルを動かそう！', this.width / 2, this.height / 2 + 40);
+        } else {
+            this.ctx.fillText('スペースキーまたはEnterでゲーム開始！', this.width / 2, this.height / 2);
+            this.ctx.font = '18px Arial';
+            this.ctx.fillText('←→キーでパドルを動かそう！', this.width / 2, this.height / 2 + 40);
+        }
     }
 
     darkenColor(color, amount) {
@@ -576,14 +665,6 @@ function backToMenu() {
     gameManager.gameState = 'menu';
     gameManager.showScreen('gameMenu');
 }
-
-// GameManagerのインスタンスを作成
-let gameManager;
-
-// ページが読み込まれたらゲームマネージャーを初期化
-document.addEventListener('DOMContentLoaded', () => {
-    gameManager = new GameManager();
-});
 
 // 追加のキーボードイベント
 document.addEventListener('keydown', (e) => {
