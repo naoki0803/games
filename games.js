@@ -32,6 +32,13 @@ class GameManager {
         let width = window.innerWidth * 0.9;
         let height = window.innerHeight * 0.7;
         
+        // モバイルの場合はさらに小さく
+        const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+        if (isMobile) {
+            width = Math.min(width, window.innerWidth - 40);
+            height = Math.min(height, window.innerHeight - 200);
+        }
+        
         // アスペクト比を維持
         if (width / height > aspectRatio) {
             width = height * aspectRatio;
@@ -45,8 +52,15 @@ class GameManager {
             height = maxHeight;
         }
         
+        // CanvasのCSSサイズも設定
+        this.canvas.style.width = width + 'px';
+        this.canvas.style.height = height + 'px';
+        
+        // Canvasの内部解像度を設定
         this.canvas.width = width;
         this.canvas.height = height;
+        
+        console.log('Canvas resized to:', width, 'x', height);
         
         // ゲームが実行中の場合はリサイズを通知
         if (this.currentGame && this.currentGame.handleResize) {
@@ -95,17 +109,18 @@ class GameManager {
         });
 
         // タッチ操作のサポート
-        this.canvas.addEventListener('touchstart', (e) => {
+        const handleTouchStart = (e) => {
             e.preventDefault();
             const touch = e.touches[0];
             this.touchStartX = touch.clientX;
             this.touchCurrentX = touch.clientX;
+            console.log('Touch start:', touch.clientX, touch.clientY);
             if (this.currentGame) {
                 this.currentGame.handleTouch(e);
             }
-        }, { passive: false });
-
-        this.canvas.addEventListener('touchmove', (e) => {
+        };
+        
+        const handleTouchMove = (e) => {
             e.preventDefault();
             if (e.touches.length > 0) {
                 const touch = e.touches[0];
@@ -114,16 +129,24 @@ class GameManager {
                     this.currentGame.handleTouchMove(e);
                 }
             }
-        }, { passive: false });
-
-        this.canvas.addEventListener('touchend', (e) => {
+        };
+        
+        const handleTouchEnd = (e) => {
             e.preventDefault();
             this.touchStartX = null;
             this.touchCurrentX = null;
+            console.log('Touch end');
             if (this.currentGame) {
                 this.currentGame.handleTouchEnd(e);
             }
-        }, { passive: false });
+        };
+        
+        // タッチイベントをCanvasに登録
+        if (this.canvas) {
+            this.canvas.addEventListener('touchstart', handleTouchStart, { passive: false });
+            this.canvas.addEventListener('touchmove', handleTouchMove, { passive: false });
+            this.canvas.addEventListener('touchend', handleTouchEnd, { passive: false });
+        }
 
         // マウス操作のサポート（デバッグ用）
         let mouseDown = false;
@@ -200,6 +223,10 @@ class BreakoutGame {
         this.targetPaddleX = null;
         this.paddleVelocity = 0;
         this.autoStart = false; // 自動開始フラグ
+        this.animationId = null;
+        
+        console.log('BreakoutGame constructor - Canvas size:', this.width, 'x', this.height);
+        console.log('Context available:', !!this.ctx);
         
         this.initializeGame();
         // 初期描画を実行
@@ -278,8 +305,11 @@ class BreakoutGame {
     }
 
     handleTouch(e) {
+        console.log('BreakoutGame.handleTouch called, gameRunning:', this.gameRunning);
+        
         // ゲームがまだ開始されていない場合は開始
         if (!this.gameRunning) {
+            console.log('Starting game from touch');
             this.startGame();
             return;
         }
@@ -289,6 +319,7 @@ class BreakoutGame {
             const touch = e.touches[0];
             const x = (touch.clientX - rect.left) * (this.canvas.width / rect.width);
             
+            console.log('Touch position:', x);
             this.touchX = x;
             this.targetPaddleX = x - this.paddle.width / 2;
         }
@@ -350,9 +381,23 @@ class BreakoutGame {
         console.log('Canvas dimensions:', this.width, 'x', this.height);
         console.log('Ball position:', this.ball.x, this.ball.y);
         console.log('Paddle position:', this.paddle.x, this.paddle.y);
+        console.log('Device info:', navigator.userAgent);
+        
+        // 既に実行中の場合は何もしない
+        if (this.gameRunning) {
+            console.log('Game already running');
+            return;
+        }
+        
         this.gameRunning = true;
         // ゲーム開始時にボールをリセット
         this.resetBall();
+        
+        // 最初のフレームを描画してから開始
+        this.draw();
+        
+        // アニメーションループを開始
+        console.log('Starting game loop');
         this.gameLoop();
     }
 
@@ -371,7 +416,14 @@ class BreakoutGame {
             return;
         }
         
-        requestAnimationFrame(() => this.gameLoop());
+        // requestAnimationFrameの互換性対応
+        const raf = window.requestAnimationFrame || 
+                   window.webkitRequestAnimationFrame || 
+                   window.mozRequestAnimationFrame || 
+                   window.msRequestAnimationFrame ||
+                   ((callback) => window.setTimeout(callback, 1000/60));
+        
+        this.animationId = raf(() => this.gameLoop());
     }
 
     update() {
@@ -515,25 +567,34 @@ class BreakoutGame {
     }
 
     draw() {
-        // 背景をクリア
-        this.ctx.fillStyle = '#000';
-        this.ctx.fillRect(0, 0, this.width, this.height);
+        if (!this.ctx) {
+            console.error('Context not available for drawing');
+            return;
+        }
         
-        // 星の背景
-        this.drawStars();
-        
-        // パドルを描画
-        this.drawPaddle();
-        
-        // ボールを描画
-        this.drawBall();
-        
-        // ブロックを描画
-        this.drawBlocks();
-        
-        // ゲーム開始前のメッセージ（autoStartの場合は表示しない）
-        if (!this.gameRunning && !this.autoStart) {
-            this.drawStartMessage();
+        try {
+            // 背景をクリア
+            this.ctx.fillStyle = '#000';
+            this.ctx.fillRect(0, 0, this.width, this.height);
+            
+            // 星の背景
+            this.drawStars();
+            
+            // パドルを描画
+            this.drawPaddle();
+            
+            // ボールを描画
+            this.drawBall();
+            
+            // ブロックを描画
+            this.drawBlocks();
+            
+            // ゲーム開始前のメッセージ（autoStartの場合は表示しない）
+            if (!this.gameRunning && !this.autoStart) {
+                this.drawStartMessage();
+            }
+        } catch (error) {
+            console.error('Error in draw:', error);
         }
     }
 
@@ -634,7 +695,15 @@ let gameManager;
 
 // ゲーム開始時の初期化
 document.addEventListener('DOMContentLoaded', () => {
+    console.log('DOMContentLoaded - Initializing GameManager');
     gameManager = new GameManager();
+    
+    // モバイルデバイスの場合、追加の初期化処理
+    if (/iPhone|iPad|iPod|Android/i.test(navigator.userAgent)) {
+        console.log('Mobile device detected');
+        // タッチイベントを有効化するためのダミータッチ
+        document.body.addEventListener('touchstart', () => {}, {passive: true});
+    }
 });
 
 // ゲーム制御関数
@@ -652,15 +721,23 @@ function startGame(gameType) {
                 console.log('Creating BreakoutGame instance');
                 gameManager.currentGame = new BreakoutGame(gameManager);
                 document.getElementById('gameTitle').textContent = 'ブロック崩し';
-                // 自動的にゲームを開始（開始メッセージを表示しない）
-                gameManager.currentGame.autoStart = true;
-                // requestAnimationFrameを使用して描画サイクルと同期
-                requestAnimationFrame(() => {
-                    if (gameManager.currentGame) {
-                        console.log('Starting game automatically');
-                        gameManager.currentGame.startGame();
-                    }
-                });
+                
+                // モバイルデバイスの場合はタッチで開始、PCは自動開始
+                const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+                if (!isMobile) {
+                    // PCの場合は自動開始
+                    gameManager.currentGame.autoStart = true;
+                    setTimeout(() => {
+                        if (gameManager.currentGame) {
+                            console.log('Starting game automatically on PC');
+                            gameManager.currentGame.startGame();
+                        }
+                    }, 200);
+                } else {
+                    // モバイルの場合はタッチ待ち
+                    console.log('Mobile device - waiting for touch to start');
+                    gameManager.currentGame.autoStart = false;
+                }
                 break;
             default:
                 alert('このゲームはまだ準備中です！');

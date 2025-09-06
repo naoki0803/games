@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>シンプル Canvas テスト</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background: #333;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            font-family: Arial, sans-serif;
+        }
+        #myCanvas {
+            border: 2px solid #fff;
+            background: #000;
+            touch-action: none;
+        }
+        #info {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            color: #fff;
+            font-size: 14px;
+        }
+        #controls {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+        }
+        button {
+            font-size: 18px;
+            padding: 10px 20px;
+            margin: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div id="info">
+        <div id="status">状態: 停止中</div>
+        <div id="fps">FPS: 0</div>
+        <div id="position">位置: (0, 0)</div>
+        <div id="device"></div>
+    </div>
+    
+    <canvas id="myCanvas" width="300" height="400"></canvas>
+    
+    <div id="controls">
+        <button onclick="toggleAnimation()">開始/停止</button>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('myCanvas');
+        const ctx = canvas.getContext('2d');
+        let isRunning = false;
+        let animationId = null;
+        let ball = {
+            x: 150,
+            y: 200,
+            vx: 2,
+            vy: 3,
+            radius: 10
+        };
+        let lastTime = 0;
+        let frameCount = 0;
+        let fps = 0;
+
+        // デバイス情報を表示
+        document.getElementById('device').textContent = `Device: ${navigator.userAgent.substring(0, 50)}...`;
+
+        function update() {
+            // ボールの移動
+            ball.x += ball.vx;
+            ball.y += ball.vy;
+
+            // 壁での反射
+            if (ball.x - ball.radius <= 0 || ball.x + ball.radius >= canvas.width) {
+                ball.vx = -ball.vx;
+            }
+            if (ball.y - ball.radius <= 0 || ball.y + ball.radius >= canvas.height) {
+                ball.vy = -ball.vy;
+            }
+
+            // 位置を表示
+            document.getElementById('position').textContent = `位置: (${Math.round(ball.x)}, ${Math.round(ball.y)})`;
+        }
+
+        function draw() {
+            // 背景をクリア
+            ctx.fillStyle = '#000';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // ボールを描画
+            ctx.beginPath();
+            ctx.arc(ball.x, ball.y, ball.radius, 0, Math.PI * 2);
+            ctx.fillStyle = '#4ecdc4';
+            ctx.fill();
+            ctx.strokeStyle = '#fff';
+            ctx.stroke();
+        }
+
+        function animate(currentTime) {
+            if (!isRunning) return;
+
+            // FPS計算
+            frameCount++;
+            if (currentTime - lastTime >= 1000) {
+                fps = frameCount;
+                document.getElementById('fps').textContent = `FPS: ${fps}`;
+                frameCount = 0;
+                lastTime = currentTime;
+            }
+
+            update();
+            draw();
+
+            animationId = requestAnimationFrame(animate);
+        }
+
+        function toggleAnimation() {
+            if (isRunning) {
+                isRunning = false;
+                document.getElementById('status').textContent = '状態: 停止中';
+                if (animationId) {
+                    cancelAnimationFrame(animationId);
+                }
+            } else {
+                isRunning = true;
+                document.getElementById('status').textContent = '状態: 実行中';
+                frameCount = 0;
+                lastTime = performance.now();
+                animate(lastTime);
+            }
+        }
+
+        // タッチでボールを移動
+        canvas.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            const rect = canvas.getBoundingClientRect();
+            const touch = e.touches[0];
+            ball.x = (touch.clientX - rect.left) * (canvas.width / rect.width);
+            ball.y = (touch.clientY - rect.top) * (canvas.height / rect.height);
+        });
+
+        canvas.addEventListener('touchmove', (e) => {
+            e.preventDefault();
+            if (e.touches.length > 0) {
+                const rect = canvas.getBoundingClientRect();
+                const touch = e.touches[0];
+                ball.x = (touch.clientX - rect.left) * (canvas.width / rect.width);
+                ball.y = (touch.clientY - rect.top) * (canvas.height / rect.height);
+            }
+        });
+
+        // 初期描画
+        draw();
+    </script>
+</body>
+</html>
