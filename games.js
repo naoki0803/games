@@ -5,6 +5,16 @@ class GameManager {
         this.gameState = 'menu'; // menu, playing, paused, gameOver
         this.canvas = document.getElementById('gameCanvas');
         this.ctx = this.canvas.getContext('2d');
+        
+        if (!this.canvas) {
+            console.error('Canvas element not found!');
+        }
+        if (!this.ctx) {
+            console.error('Failed to get 2D context!');
+        }
+        
+        console.log('GameManager initialized - Canvas:', this.canvas, 'Context:', this.ctx);
+        
         this.touchStartX = null;
         this.touchCurrentX = null;
         this.setupEventListeners();
@@ -192,6 +202,8 @@ class BreakoutGame {
         this.autoStart = false; // 自動開始フラグ
         
         this.initializeGame();
+        // 初期描画を実行
+        this.draw();
     }
 
     initializeGame() {
@@ -335,6 +347,9 @@ class BreakoutGame {
 
     startGame() {
         console.log('BreakoutGame.startGame() called');
+        console.log('Canvas dimensions:', this.width, 'x', this.height);
+        console.log('Ball position:', this.ball.x, this.ball.y);
+        console.log('Paddle position:', this.paddle.x, this.paddle.y);
         this.gameRunning = true;
         // ゲーム開始時にボールをリセット
         this.resetBall();
@@ -347,13 +362,26 @@ class BreakoutGame {
             return;
         }
         
-        this.update();
-        this.draw();
+        try {
+            this.update();
+            this.draw();
+        } catch (error) {
+            console.error('Error in game loop:', error);
+            this.gameRunning = false;
+            return;
+        }
         
         requestAnimationFrame(() => this.gameLoop());
     }
 
     update() {
+        // デバッグ情報を最初の数フレームだけ出力
+        if (!this.frameCount) this.frameCount = 0;
+        this.frameCount++;
+        if (this.frameCount <= 5) {
+            console.log('Frame', this.frameCount, '- Ball position:', this.ball.x.toFixed(2), this.ball.y.toFixed(2), 'Speed:', this.ball.speedX.toFixed(2), this.ball.speedY.toFixed(2));
+        }
+        
         // タッチ操作によるパドル移動（スムーズな追従）
         if (this.targetPaddleX !== null) {
             const diff = this.targetPaddleX - this.paddle.x;
@@ -616,27 +644,36 @@ function startGame(gameType) {
         return;
     }
     
-    gameManager.showScreen('gameScreen');
-    
-    switch (gameType) {
-        case 'breakout':
-            gameManager.currentGame = new BreakoutGame(gameManager);
-            document.getElementById('gameTitle').textContent = 'ブロック崩し';
-            // 自動的にゲームを開始（開始メッセージを表示しない）
-            gameManager.currentGame.autoStart = true;
-            setTimeout(() => {
-                if (gameManager.currentGame) {
-                    gameManager.currentGame.startGame();
-                }
-            }, 100);
-            break;
-        default:
-            alert('このゲームはまだ準備中です！');
-            backToMenu();
-            return;
+    try {
+        gameManager.showScreen('gameScreen');
+        
+        switch (gameType) {
+            case 'breakout':
+                console.log('Creating BreakoutGame instance');
+                gameManager.currentGame = new BreakoutGame(gameManager);
+                document.getElementById('gameTitle').textContent = 'ブロック崩し';
+                // 自動的にゲームを開始（開始メッセージを表示しない）
+                gameManager.currentGame.autoStart = true;
+                // requestAnimationFrameを使用して描画サイクルと同期
+                requestAnimationFrame(() => {
+                    if (gameManager.currentGame) {
+                        console.log('Starting game automatically');
+                        gameManager.currentGame.startGame();
+                    }
+                });
+                break;
+            default:
+                alert('このゲームはまだ準備中です！');
+                backToMenu();
+                return;
+        }
+        
+        gameManager.gameState = 'playing';
+    } catch (error) {
+        console.error('Error starting game:', error);
+        alert('ゲームの開始に失敗しました。');
+        backToMenu();
     }
-    
-    gameManager.gameState = 'playing';
 }
 
 function pauseGame() {
