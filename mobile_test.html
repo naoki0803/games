@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <title>モバイルデバッグテスト</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            font-family: Arial, sans-serif;
+            background: #f0f0f0;
+        }
+        #canvas {
+            border: 2px solid #333;
+            background: #000;
+            display: block;
+            margin: 20px auto;
+            touch-action: none;
+        }
+        #log {
+            background: white;
+            border: 1px solid #ccc;
+            padding: 10px;
+            margin: 20px auto;
+            width: 90%;
+            max-width: 800px;
+            height: 200px;
+            overflow-y: auto;
+            font-size: 12px;
+        }
+        .control {
+            text-align: center;
+            margin: 20px;
+        }
+        button {
+            font-size: 18px;
+            padding: 10px 20px;
+            margin: 5px;
+        }
+        .status {
+            text-align: center;
+            font-size: 16px;
+            margin: 10px;
+        }
+    </style>
+</head>
+<body>
+    <h1 style="text-align: center;">モバイルCanvas テスト</h1>
+    
+    <div class="status">
+        <p>デバイス: <span id="device"></span></p>
+        <p>Canvas サポート: <span id="canvasSupport"></span></p>
+        <p>requestAnimationFrame: <span id="rafSupport"></span></p>
+        <p>タッチサポート: <span id="touchSupport"></span></p>
+    </div>
+
+    <div class="control">
+        <button id="startBtn" onclick="startAnimation()">アニメーション開始</button>
+        <button onclick="clearLog()">ログクリア</button>
+    </div>
+
+    <canvas id="canvas" width="400" height="300"></canvas>
+    
+    <div id="log"></div>
+
+    <script>
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        const log = document.getElementById('log');
+        let animationId = null;
+        let ball = {
+            x: 200,
+            y: 150,
+            vx: 2,
+            vy: 1.5,
+            radius: 20
+        };
+        let isAnimating = false;
+        let frameCount = 0;
+        let lastTime = 0;
+        let fps = 0;
+
+        // デバイス情報の表示
+        document.getElementById('device').textContent = navigator.userAgent;
+        document.getElementById('canvasSupport').textContent = !!canvas.getContext ? '✓' : '✗';
+        document.getElementById('rafSupport').textContent = !!window.requestAnimationFrame ? '✓' : '✗';
+        document.getElementById('touchSupport').textContent = 'ontouchstart' in window ? '✓' : '✗';
+
+        function addLog(message) {
+            const time = new Date().toLocaleTimeString();
+            log.innerHTML = `<div>[${time}] ${message}</div>` + log.innerHTML;
+            if (log.children.length > 100) {
+                log.removeChild(log.lastChild);
+            }
+        }
+
+        function clearLog() {
+            log.innerHTML = '';
+        }
+
+        // Canvas初期描画
+        function drawInitial() {
+            ctx.fillStyle = '#000';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            ctx.fillStyle = '#fff';
+            ctx.font = '20px Arial';
+            ctx.textAlign = 'center';
+            ctx.fillText('タップまたはクリックで開始', canvas.width / 2, canvas.height / 2);
+        }
+
+        function update() {
+            // ボールの移動
+            ball.x += ball.vx;
+            ball.y += ball.vy;
+
+            // 壁での反射
+            if (ball.x - ball.radius <= 0 || ball.x + ball.radius >= canvas.width) {
+                ball.vx = -ball.vx;
+                addLog('壁で反射（横）');
+            }
+            if (ball.y - ball.radius <= 0 || ball.y + ball.radius >= canvas.height) {
+                ball.vy = -ball.vy;
+                addLog('壁で反射（縦）');
+            }
+
+            // 境界内に収める
+            ball.x = Math.max(ball.radius, Math.min(canvas.width - ball.radius, ball.x));
+            ball.y = Math.max(ball.radius, Math.min(canvas.height - ball.radius, ball.y));
+        }
+
+        function draw() {
+            // 背景をクリア
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.1)';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // ボールを描画
+            ctx.beginPath();
+            ctx.arc(ball.x, ball.y, ball.radius, 0, Math.PI * 2);
+            ctx.fillStyle = '#4ecdc4';
+            ctx.fill();
+            ctx.strokeStyle = '#fff';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+
+            // FPS表示
+            ctx.fillStyle = '#fff';
+            ctx.font = '16px Arial';
+            ctx.textAlign = 'left';
+            ctx.fillText(`FPS: ${fps.toFixed(1)}`, 10, 20);
+            ctx.fillText(`Frame: ${frameCount}`, 10, 40);
+            ctx.fillText(`Position: (${ball.x.toFixed(0)}, ${ball.y.toFixed(0)})`, 10, 60);
+        }
+
+        function animate(currentTime) {
+            if (!isAnimating) {
+                addLog('アニメーション停止');
+                return;
+            }
+
+            frameCount++;
+            
+            // FPS計算
+            if (currentTime - lastTime >= 1000) {
+                fps = frameCount * 1000 / (currentTime - lastTime);
+                if (frameCount % 60 === 0) {
+                    addLog(`FPS: ${fps.toFixed(1)}, Frames: ${frameCount}`);
+                }
+                lastTime = currentTime;
+                frameCount = 0;
+            }
+
+            try {
+                update();
+                draw();
+            } catch (error) {
+                addLog(`エラー: ${error.message}`);
+                isAnimating = false;
+                return;
+            }
+
+            // 次のフレーム
+            const raf = window.requestAnimationFrame || 
+                       window.webkitRequestAnimationFrame || 
+                       window.mozRequestAnimationFrame || 
+                       window.msRequestAnimationFrame ||
+                       ((callback) => window.setTimeout(callback, 1000/60));
+            
+            animationId = raf(animate);
+        }
+
+        function startAnimation() {
+            if (isAnimating) {
+                isAnimating = false;
+                document.getElementById('startBtn').textContent = 'アニメーション開始';
+                addLog('アニメーション停止要求');
+                if (animationId) {
+                    cancelAnimationFrame(animationId);
+                }
+            } else {
+                isAnimating = true;
+                document.getElementById('startBtn').textContent = 'アニメーション停止';
+                addLog('アニメーション開始');
+                frameCount = 0;
+                lastTime = performance.now();
+                animate(lastTime);
+            }
+        }
+
+        // タッチイベント
+        canvas.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            const rect = canvas.getBoundingClientRect();
+            const touch = e.touches[0];
+            const x = touch.clientX - rect.left;
+            const y = touch.clientY - rect.top;
+            addLog(`タッチ開始: (${x.toFixed(0)}, ${y.toFixed(0)})`);
+            
+            // ボールをタッチ位置に移動
+            ball.x = x * (canvas.width / rect.width);
+            ball.y = y * (canvas.height / rect.height);
+        });
+
+        canvas.addEventListener('touchmove', (e) => {
+            e.preventDefault();
+            if (e.touches.length > 0) {
+                const rect = canvas.getBoundingClientRect();
+                const touch = e.touches[0];
+                const x = touch.clientX - rect.left;
+                const y = touch.clientY - rect.top;
+                
+                // ボールをタッチ位置に移動
+                ball.x = x * (canvas.width / rect.width);
+                ball.y = y * (canvas.height / rect.height);
+            }
+        });
+
+        // マウスイベント（デスクトップ用）
+        canvas.addEventListener('click', (e) => {
+            const rect = canvas.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+            const y = e.clientY - rect.top;
+            addLog(`クリック: (${x.toFixed(0)}, ${y.toFixed(0)})`);
+            
+            // ボールをクリック位置に移動
+            ball.x = x * (canvas.width / rect.width);
+            ball.y = y * (canvas.height / rect.height);
+        });
+
+        // 初期描画
+        drawInitial();
+        addLog('ページ読み込み完了');
+    </script>
+</body>
+</html>
