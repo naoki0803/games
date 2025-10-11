@@ -96,6 +96,15 @@ body {
     margin-bottom: 20px;
 }
 
+.version {
+    font-size: 0.9rem;
+    color: rgba(255, 255, 255, 0.7);
+    text-align: center;
+    margin-top: -10px;
+    margin-bottom: 10px;
+    font-weight: 500;
+}
+
 .screen-title {
     font-size: 1.8rem;
     font-weight: 700;

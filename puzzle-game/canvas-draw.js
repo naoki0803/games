@@ -14,12 +14,26 @@ let drawState = {
 };
 
 function initDrawMode() {
-    drawState.canvas = document.getElementById('drawCanvas');
-    drawState.ctx = drawState.canvas.getContext('2d');
+    if (!drawState.canvas) {
+        drawState.canvas = document.getElementById('drawCanvas');
+        drawState.ctx = drawState.canvas.getContext('2d');
+    }
     
     // キャンバスを白で塗りつぶす
     drawState.ctx.fillStyle = '#ffffff';
     drawState.ctx.fillRect(0, 0, drawState.canvas.width, drawState.canvas.height);
+    
+    // 消しゴムモードをリセット
+    drawState.isEraser = false;
+    const eraserBtn = document.getElementById('eraserBtn');
+    eraserBtn.style.background = '';
+    eraserBtn.style.color = '';
+}
+
+// ページロード時にイベントリスナーを一度だけ登録
+window.addEventListener('load', () => {
+    const canvas = document.getElementById('drawCanvas');
+    const ctx = canvas.getContext('2d');
     
     // ペンサイズスライダー
     const penSizeInput = document.getElementById('penSize');
@@ -53,21 +67,25 @@ function initDrawMode() {
     // 全消去ボタン
     document.getElementById('clearCanvasBtn').addEventListener('click', () => {
         if (confirm('キャンバスを全消去しますか？')) {
+            if (!drawState.ctx) {
+                drawState.canvas = document.getElementById('drawCanvas');
+                drawState.ctx = drawState.canvas.getContext('2d');
+            }
             drawState.ctx.fillStyle = '#ffffff';
             drawState.ctx.fillRect(0, 0, drawState.canvas.width, drawState.canvas.height);
         }
     });
     
     // 描画イベント（マウス）
-    drawState.canvas.addEventListener('mousedown', startDrawing);
-    drawState.canvas.addEventListener('mousemove', draw);
-    drawState.canvas.addEventListener('mouseup', stopDrawing);
-    drawState.canvas.addEventListener('mouseleave', stopDrawing);
+    canvas.addEventListener('mousedown', startDrawing);
+    canvas.addEventListener('mousemove', draw);
+    canvas.addEventListener('mouseup', stopDrawing);
+    canvas.addEventListener('mouseleave', stopDrawing);
     
     // 描画イベント（タッチ）
-    drawState.canvas.addEventListener('touchstart', handleTouchStart);
-    drawState.canvas.addEventListener('touchmove', handleTouchMove);
-    drawState.canvas.addEventListener('touchend', stopDrawing);
+    canvas.addEventListener('touchstart', handleTouchStart);
+    canvas.addEventListener('touchmove', handleTouchMove);
+    canvas.addEventListener('touchend', stopDrawing);
     
     // 戻るボタン
     document.getElementById('drawBackBtn').addEventListener('click', () => {
@@ -76,11 +94,15 @@ function initDrawMode() {
     
     // 完了ボタン
     document.getElementById('drawDoneBtn').addEventListener('click', () => {
+        if (!drawState.canvas) {
+            drawState.canvas = document.getElementById('drawCanvas');
+        }
         gameState.imageSource = 'draw';
         gameState.imageData = drawState.canvas.toDataURL();
+        console.log('手描きデータを保存:', gameState.imageData.substring(0, 50) + '...');
         showPreview();
     });
-}
+});
 
 function startDrawing(e) {
     drawState.isDrawing = true;
