@@ -140,22 +140,34 @@ function initGame() {
     // 空白タイルは右下
     gameState.emptyTile = { row: 4, col: 4 };
     
-    // パズルボードを作成
-    createPuzzleBoard();
-    
-    // シャッフル
-    shufflePuzzle();
-    
-    // ゲーム状態をリセット
-    gameState.moves = 0;
-    gameState.isComplete = false;
-    updateMoveCount();
-    startTimer();
+    // DOMのレンダリングとレイアウト計算を待ってからパズルボードを作成
+    // これにより.puzzle-boardのサイズが正しく計算された後にタイルが生成される
+    requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+            // パズルボードを作成
+            createPuzzleBoard();
+            
+            // シャッフル
+            shufflePuzzle();
+            
+            // ゲーム状態をリセット
+            gameState.moves = 0;
+            gameState.isComplete = false;
+            updateMoveCount();
+            startTimer();
+        });
+    });
 }
 
 function createPuzzleBoard() {
     const board = document.getElementById('puzzleBoard');
     board.innerHTML = '';
+    
+    // パズルボードの高さを明示的に設定（aspect-ratioのフォールバック）
+    const boardWidth = board.offsetWidth;
+    if (boardWidth > 0) {
+        board.style.height = `${boardWidth}px`;
+    }
     
     for (let i = 0; i < 25; i++) {
         const tile = document.createElement('div');

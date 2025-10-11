@@ -362,6 +362,7 @@ body {
     gap: 4px;
     aspect-ratio: 1;
     max-width: 100%;
+    min-height: 300px; /* aspect-ratioのフォールバック：最小高さを保証 */
     margin: 0 auto;
     touch-action: none;
 }
@@ -377,6 +378,8 @@ body {
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
     touch-action: manipulation;
     -webkit-tap-highlight-color: transparent;
+    min-width: 40px; /* タイルの最小サイズを保証 */
+    min-height: 40px;
 }
 
 .puzzle-tile:not(.empty):hover {
