@@ -69,30 +69,33 @@ function processImage(img) {
     const canvas = document.createElement('canvas');
     const ctx = canvas.getContext('2d');
     
+    // 元画像のサイズ
+    const imgWidth = img.width;
+    const imgHeight = img.height;
+    
+    // 正方形のサイズを決定（短い方の辺に合わせる）
+    const size = Math.min(imgWidth, imgHeight);
+    
     // 最大サイズを800x800に制限
-    let width = img.width;
-    let height = img.height;
     const maxSize = 800;
+    const finalSize = Math.min(size, maxSize);
     
-    if (width > maxSize || height > maxSize) {
-        if (width > height) {
-            height = (height / width) * maxSize;
-            width = maxSize;
-        } else {
-            width = (width / height) * maxSize;
-            height = maxSize;
-        }
-    }
+    canvas.width = finalSize;
+    canvas.height = finalSize;
     
-    // 正方形にクロップ
-    const size = Math.min(width, height);
-    canvas.width = size;
-    canvas.height = size;
+    // 元画像の中央から正方形を切り取る
+    // ソース座標（元画像のどこから切り取るか）
+    const sx = (imgWidth - size) / 2;  // 横方向の中央
+    const sy = (imgHeight - size) / 2; // 縦方向の中央
     
-    // 中央寄せで描画
-    const x = (size - width) / 2;
-    const y = (size - height) / 2;
-    ctx.drawImage(img, x, y, width, height);
+    // 元画像の中央部分(size x size)をcanvas全体(finalSize x finalSize)に描画
+    ctx.drawImage(
+        img,           // ソース画像
+        sx, sy,        // ソースの切り取り開始位置
+        size, size,    // ソースの切り取りサイズ
+        0, 0,          // canvas上の描画開始位置
+        finalSize, finalSize  // canvas上の描画サイズ
+    );
     
     gameState.imageData = canvas.toDataURL();
     showPreview();
