@@ -49,13 +49,13 @@ const bulletHeight = 15;
 
 // 敵
 let invaders = [];
-let invaderRows = 5;
-let invaderCols = 10;
-const invaderWidth = 40;
-const invaderHeight = 30;
-let invaderSpeed = 1;
+let invaderRows = 6;
+let invaderCols = 12;
+const invaderWidth = 36;
+const invaderHeight = 27;
+let invaderSpeed = 0.7;
 let invaderDirection = 1;
-let invaderDropDistance = 20;
+let invaderDropDistance = 15;
 
 // 敵の弾丸
 let enemyBullets = [];
@@ -75,16 +75,16 @@ function init() {
     
     // モバイルでは敵の数を減らす
     if (isMobile()) {
-        invaderRows = 4;
-        invaderCols = 6;
+        invaderRows = 5;
+        invaderCols = 8;
         player.speed = 6; // 移動を少し速く
     } else {
-        invaderRows = 5;
-        invaderCols = 10;
+        invaderRows = 6;
+        invaderCols = 12;
         player.speed = 5;
     }
     
-    invaderSpeed = 1 + (level - 1) * 0.3;
+    invaderSpeed = 0.7 + (level - 1) * 0.2;
     createInvaders();
     updateDisplay();
 }
