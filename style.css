@@ -1,0 +1,365 @@
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+html {
+    /* スクロール防止 */
+    overflow: hidden;
+    height: 100%;
+    width: 100%;
+    position: fixed;
+}
+
+body {
+    font-family: 'Arial', sans-serif;
+    background: linear-gradient(to bottom, #000428, #004e92);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    color: white;
+    /* タッチ操作の改善 */
+    touch-action: none;
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    user-select: none;
+    /* iPhone安全領域対応 */
+    padding-top: env(safe-area-inset-top);
+    padding-bottom: env(safe-area-inset-bottom);
+    padding-left: env(safe-area-inset-left);
+    padding-right: env(safe-area-inset-right);
+    /* スクロール防止 */
+    overflow: hidden;
+    height: 100%;
+    width: 100%;
+    position: fixed;
+}
+
+.game-container {
+    background: rgba(0, 0, 0, 0.7);
+    border-radius: 20px;
+    padding: 20px;
+    box-shadow: 0 0 30px rgba(0, 255, 255, 0.5);
+}
+
+.header {
+    text-align: center;
+    margin-bottom: 20px;
+}
+
+h1 {
+    font-size: 2.5em;
+    color: #00ff00;
+    text-shadow: 0 0 10px #00ff00;
+    margin-bottom: 15px;
+}
+
+.info {
+    display: flex;
+    justify-content: space-around;
+    font-size: 1.2em;
+    margin-bottom: 10px;
+}
+
+.score, .lives {
+    background: rgba(0, 255, 0, 0.2);
+    padding: 10px 20px;
+    border-radius: 10px;
+    border: 2px solid #00ff00;
+}
+
+#gameCanvas {
+    display: block;
+    background: #000;
+    border: 3px solid #00ff00;
+    box-shadow: 0 0 20px rgba(0, 255, 0, 0.5);
+}
+
+.controls {
+    text-align: center;
+    margin-top: 20px;
+    font-size: 1.1em;
+    color: #00ffff;
+}
+
+.game-over, .game-win {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: rgba(0, 0, 0, 0.95);
+    padding: 40px;
+    border-radius: 15px;
+    text-align: center;
+    border: 3px solid #ff0000;
+    box-shadow: 0 0 30px rgba(255, 0, 0, 0.8);
+}
+
+.game-win {
+    border-color: #00ff00;
+    box-shadow: 0 0 30px rgba(0, 255, 0, 0.8);
+}
+
+.game-over h2 {
+    color: #ff0000;
+    font-size: 3em;
+    margin-bottom: 20px;
+    text-shadow: 0 0 10px #ff0000;
+}
+
+.game-win h2 {
+    color: #00ff00;
+    font-size: 3em;
+    margin-bottom: 20px;
+    text-shadow: 0 0 10px #00ff00;
+}
+
+.game-over p, .game-win p {
+    font-size: 1.5em;
+    margin: 10px 0;
+}
+
+.hidden {
+    display: none;
+}
+
+/* 仮想コントローラー */
+.virtual-controls {
+    display: none;
+    margin-top: 20px;
+    gap: 15px;
+    flex-direction: column;
+    align-items: center;
+}
+
+.controls-row {
+    display: flex;
+    gap: 20px;
+    justify-content: space-between;
+    align-items: center;
+    width: 100%;
+}
+
+.move-buttons {
+    display: flex;
+    gap: 20px;
+    justify-content: center;
+}
+
+.control-btn {
+    font-size: 1.5em;
+    padding: 15px 30px;
+    border: 3px solid #00ff00;
+    background: rgba(0, 255, 0, 0.2);
+    color: #00ff00;
+    border-radius: 15px;
+    cursor: pointer;
+    user-select: none;
+    -webkit-user-select: none;
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
+    transition: all 0.2s;
+    font-weight: bold;
+}
+
+.control-btn:active {
+    background: rgba(0, 255, 0, 0.5);
+    transform: scale(0.95);
+    box-shadow: 0 0 20px rgba(0, 255, 0, 0.8);
+}
+
+.move-btn {
+    width: 80px;
+    height: 80px;
+    font-size: 2em;
+}
+
+.fire-btn {
+    background: rgba(255, 100, 0, 0.2);
+    border-color: #ff6400;
+    color: #ff6400;
+    padding: 20px 50px;
+    font-size: 1.8em;
+}
+
+.fire-btn:active {
+    background: rgba(255, 100, 0, 0.5);
+    box-shadow: 0 0 20px rgba(255, 100, 0, 0.8);
+}
+
+.start-btn {
+    background: rgba(0, 255, 255, 0.2);
+    border-color: #00ffff;
+    color: #00ffff;
+    padding: 15px 40px;
+}
+
+.start-btn:active {
+    background: rgba(0, 255, 255, 0.5);
+    box-shadow: 0 0 20px rgba(0, 255, 255, 0.8);
+}
+
+.desktop-controls {
+    display: block;
+}
+
+.mobile-controls {
+    display: none;
+}
+
+@media (max-width: 768px) {
+    body {
+        align-items: flex-start;
+        padding-top: max(10px, env(safe-area-inset-top));
+        padding-bottom: max(120px, env(safe-area-inset-bottom));
+        justify-content: flex-start;
+        overflow-y: auto;
+    }
+    
+    h1 {
+        font-size: 1.5em;
+        margin-bottom: 10px;
+    }
+    
+    .header {
+        margin-bottom: 10px;
+    }
+    
+    .info {
+        flex-direction: row;
+        gap: 10px;
+        font-size: 0.9em;
+    }
+    
+    .score, .lives {
+        padding: 6px 12px;
+    }
+    
+    .game-container {
+        padding: 10px;
+        width: 100%;
+        max-width: 100%;
+        border-radius: 0;
+        background: rgba(0, 0, 0, 0.85);
+        box-shadow: none;
+        min-height: 100vh;
+        display: flex;
+        flex-direction: column;
+    }
+    
+    #gameCanvas {
+        width: 100% !important;
+        max-width: 100%;
+        height: auto;
+        border-radius: 5px;
+    }
+    
+    .virtual-controls {
+        display: flex;
+        margin-top: 15px;
+        margin-bottom: 100px;
+        padding-bottom: max(20px, env(safe-area-inset-bottom));
+    }
+    
+    .controls-row {
+        gap: 15px;
+    }
+    
+    .move-buttons {
+        gap: 15px;
+    }
+    
+    .move-btn {
+        width: 70px;
+        height: 70px;
+        font-size: 1.8em;
+        padding: 10px;
+    }
+    
+    .fire-btn {
+        padding: 15px 40px;
+        font-size: 1.5em;
+    }
+    
+    .start-btn {
+        padding: 12px 35px;
+        font-size: 1.2em;
+    }
+    
+    .desktop-controls {
+        display: none;
+    }
+    
+    .mobile-controls {
+        display: block;
+        font-size: 0.85em;
+    }
+    
+    .controls {
+        margin-top: 8px;
+        margin-bottom: 5px;
+    }
+    
+    .game-over, .game-win {
+        width: 90%;
+        max-width: 350px;
+        padding: 30px 20px;
+        position: fixed;
+    }
+    
+    .game-over h2, .game-win h2 {
+        font-size: 2em;
+    }
+    
+    .game-over p, .game-win p {
+        font-size: 1.2em;
+    }
+}
+
+/* 横画面モード対応 */
+@media (max-width: 768px) and (orientation: landscape) {
+    .game-container {
+        padding: 5px;
+        min-height: auto;
+    }
+    
+    h1 {
+        font-size: 1.2em;
+        margin-bottom: 5px;
+    }
+    
+    .header {
+        margin-bottom: 5px;
+    }
+    
+    .info {
+        font-size: 0.8em;
+    }
+    
+    .virtual-controls {
+        margin-top: 8px;
+        gap: 8px;
+    }
+    
+    .controls-row {
+        gap: 10px;
+    }
+    
+    .move-btn {
+        width: 60px;
+        height: 60px;
+        font-size: 1.5em;
+    }
+    
+    .fire-btn {
+        padding: 10px 30px;
+        font-size: 1.2em;
+    }
+    
+    .start-btn {
+        padding: 8px 25px;
+        font-size: 1em;
+    }
+}

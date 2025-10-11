@@ -2,78 +2,70 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <title>子供向けゲームコレクション</title>
-    <link rel="stylesheet" href="styles.css">
+    <meta name="apple-mobile-web-app-title" content="インベーダー">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="theme-color" content="#000428">
+    <title>スペースインベーダー</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="manifest" href="manifest.json">
 </head>
 <body>
-    <div class="container">
-        <h1>🎮 子供向けゲームコレクション</h1>
-        
-        <!-- ゲーム選択メニュー -->
-        <div id="gameMenu" class="game-menu">
-            <h2>ゲームを選んでください</h2>
-            <div class="game-buttons">
-                <button class="game-btn" onclick="startGame('breakout')" ontouchstart="">
-                    🧱 ブロック崩し
-                </button>
-                <button class="game-btn" onclick="window.location.href='invader-game/index.html'" ontouchstart="">
-                    👾 インベーダー
-                </button>
-                <button class="game-btn" onclick="startGame('snake')" disabled>
-                    🐍 スネーク（準備中）
-                </button>
-                <button class="game-btn" onclick="startGame('tetris')" disabled>
-                    🟦 テトリス（準備中）
-                </button>
-                <button class="game-btn" onclick="startGame('pong')" disabled>
-                    🏓 ポン（準備中）
-                </button>
-            </div>
-        </div>
-
-        <!-- ゲーム画面 -->
-        <div id="gameScreen" class="game-screen hidden">
-            <div class="game-header">
-                <h2 id="gameTitle">ブロック崩し</h2>
-                <div class="game-controls">
-                    <button onclick="pauseGame()">⏸️ 一時停止</button>
-                    <button onclick="backToMenu()">🏠 メニューに戻る</button>
-                </div>
-            </div>
-            
-            <div class="game-info">
+    <div class="game-container">
+        <div class="header">
+            <h1>スペースインベーダー</h1>
+            <div class="info">
                 <div class="score">スコア: <span id="score">0</span></div>
-                <div class="lives">残り: <span id="lives">3</span></div>
-                <div class="level">レベル: <span id="level">1</span></div>
-            </div>
-            
-            <canvas id="gameCanvas" width="800" height="600"></canvas>
-            
-            <div class="game-instructions">
-                <p class="desktop-instructions">← → キーでパドルを動かしてボールを跳ね返そう！</p>
-                <p class="mobile-instructions">画面をタッチしてパドルを動かそう！</p>
-                <p>すべてのブロックを壊してクリアしよう！</p>
+                <div class="lives">残機: <span id="lives">3</span></div>
             </div>
         </div>
-
-        <!-- ゲームオーバー画面 -->
-        <div id="gameOverScreen" class="game-over hidden">
-            <div class="game-over-content">
-                <h2 id="gameOverTitle">ゲームオーバー</h2>
-                <div class="final-score">
-                    最終スコア: <span id="finalScore">0</span>
+        <canvas id="gameCanvas"></canvas>
+        
+        <!-- 仮想コントローラー -->
+        <div class="virtual-controls">
+            <div class="controls-row">
+                <div class="move-buttons">
+                    <button id="leftBtn" class="control-btn move-btn">◄</button>
+                    <button id="rightBtn" class="control-btn move-btn">►</button>
                 </div>
-                <div class="game-over-buttons">
-                    <button onclick="restartGame()">🔄 もう一度</button>
-                    <button onclick="backToMenu()">🏠 メニューに戻る</button>
-                </div>
+                <button id="fireBtn" class="control-btn fire-btn">🚀 発射</button>
             </div>
+            <button id="startBtn" class="control-btn start-btn">▶ スタート</button>
+        </div>
+        
+        <div class="controls">
+            <p class="desktop-controls">PC: ← → 移動 | スペース: 発射 | Enter: 開始</p>
+            <p class="mobile-controls">📱 画面タップまたはボタンで操作</p>
+        </div>
+        <div id="gameOver" class="game-over hidden">
+            <h2>ゲームオーバー</h2>
+            <p>最終スコア: <span id="finalScore">0</span></p>
+            <p class="desktop-controls">Enterキーでリスタート</p>
+            <p class="mobile-controls">スタートボタンでリスタート</p>
+        </div>
+        <div id="gameWin" class="game-win hidden">
+            <h2>ステージクリア！</h2>
+            <p>スコア: <span id="winScore">0</span></p>
+            <p class="desktop-controls">Enterキーで次のステージ</p>
+            <p class="mobile-controls">スタートボタンで次のステージ</p>
         </div>
     </div>
-
-    <script src="games.js"></script>
+    <script src="game.js"></script>
+    <script>
+        // Service Worker登録
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('./service-worker.js')
+                    .then((registration) => {
+                        console.log('Service Worker登録成功:', registration);
+                    })
+                    .catch((error) => {
+                        console.log('Service Worker登録失敗:', error);
+                    });
+            });
+        }
+    </script>
 </body>
 </html>
