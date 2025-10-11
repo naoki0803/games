@@ -484,3 +484,10 @@ function setupVirtualButtons() {
 init();
 setupVirtualButtons();
 gameLoop();
+
+// 自動的にゲームを開始
+setTimeout(() => {
+    if (gameState === 'ready') {
+        gameState = 'playing';
+    }
+}, 100);
