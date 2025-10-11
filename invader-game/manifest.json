@@ -1,0 +1,14 @@
+{
+  "name": "スペースインベーダー",
+  "short_name": "インベーダー",
+  "description": "クラシックなスペースインベーダーゲーム - iPhone対応",
+  "start_url": "./index.html",
+  "display": "fullscreen",
+  "orientation": "portrait",
+  "background_color": "#000428",
+  "theme_color": "#000428",
+  "icons": [],
+  "categories": ["games", "entertainment"],
+  "lang": "ja",
+  "dir": "ltr"
+}
