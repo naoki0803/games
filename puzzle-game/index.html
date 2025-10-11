@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="theme-color" content="#667eea">
+    <title>5x5スライディングパズル</title>
+    <link rel="manifest" href="manifest.json">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <!-- スタート画面 -->
+    <div id="startScreen" class="screen active">
+        <div class="container">
+            <h1 class="title">🧩 5x5 スライディングパズル</h1>
+            <p class="subtitle">画像を選んでパズルを楽しもう！</p>
+            
+            <div class="card">
+                <h2>画像を選択</h2>
+                <div class="button-group">
+                    <button id="drawModeBtn" class="btn btn-primary">
+                        <span class="icon">✏️</span>
+                        手描きで作成
+                    </button>
+                    <button id="uploadModeBtn" class="btn btn-secondary">
+                        <span class="icon">📷</span>
+                        写真をアップロード
+                    </button>
+                </div>
+                <input type="file" id="imageInput" accept="image/*" style="display: none;">
+            </div>
+        </div>
+    </div>
+
+    <!-- 手描きモード画面 -->
+    <div id="drawScreen" class="screen">
+        <div class="container">
+            <h2 class="screen-title">手描きモード</h2>
+            
+            <div class="canvas-container">
+                <canvas id="drawCanvas" width="800" height="800"></canvas>
+            </div>
+            
+            <div class="draw-tools">
+                <div class="tool-group">
+                    <label>ペンサイズ</label>
+                    <input type="range" id="penSize" min="2" max="50" value="10">
+                    <span id="penSizeValue">10</span>
+                </div>
+                <div class="tool-group">
+                    <label>色</label>
+                    <input type="color" id="penColor" value="#000000">
+                </div>
+                <div class="button-group">
+                    <button id="eraserBtn" class="btn btn-tool">消しゴム</button>
+                    <button id="clearCanvasBtn" class="btn btn-tool">全消去</button>
+                </div>
+            </div>
+            
+            <div class="button-group">
+                <button id="drawBackBtn" class="btn btn-secondary">← 戻る</button>
+                <button id="drawDoneBtn" class="btn btn-primary">完了 ✓</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- プレビュー画面 -->
+    <div id="previewScreen" class="screen">
+        <div class="container">
+            <h2 class="screen-title">画像プレビュー</h2>
+            
+            <div class="preview-container">
+                <img id="previewImage" src="" alt="プレビュー">
+            </div>
+            
+            <div class="button-group">
+                <button id="previewBackBtn" class="btn btn-secondary">← 編集に戻る</button>
+                <button id="startGameBtn" class="btn btn-primary btn-large">ゲームスタート 🎮</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ゲーム画面 -->
+    <div id="gameScreen" class="screen">
+        <div class="game-container">
+            <div class="game-header">
+                <div class="game-info">
+                    <div class="info-item">
+                        <span class="info-label">移動:</span>
+                        <span id="moveCount" class="info-value">0</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-label">時間:</span>
+                        <span id="timer" class="info-value">00:00</span>
+                    </div>
+                </div>
+                <div class="game-actions">
+                    <button id="hintBtn" class="btn btn-small">💡 ヒント</button>
+                    <button id="resetBtn" class="btn btn-small">🔄 リセット</button>
+                </div>
+            </div>
+            
+            <div id="puzzleBoard" class="puzzle-board">
+                <!-- パズルタイルが動的に生成される -->
+            </div>
+            
+            <div class="game-footer">
+                <button id="giveUpBtn" class="btn btn-secondary">諦める</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 完成画面 -->
+    <div id="completeScreen" class="screen">
+        <div class="container">
+            <div class="celebration">🎉</div>
+            <h2 class="complete-title">おめでとうございます！</h2>
+            <p class="complete-message">パズルが完成しました！</p>
+            
+            <div class="result-card">
+                <div class="result-item">
+                    <span class="result-label">移動回数:</span>
+                    <span id="finalMoves" class="result-value">0</span>
+                </div>
+                <div class="result-item">
+                    <span class="result-label">経過時間:</span>
+                    <span id="finalTime" class="result-value">00:00</span>
+                </div>
+            </div>
+            
+            <div class="complete-image-container">
+                <img id="completeImage" src="" alt="完成画像">
+            </div>
+            
+            <div class="button-group">
+                <button id="playAgainBtn" class="btn btn-secondary">もう一度</button>
+                <button id="newImageBtn" class="btn btn-primary">別の画像で</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ヒントモーダル -->
+    <div id="hintModal" class="modal">
+        <div class="modal-content">
+            <h3>正解画像</h3>
+            <img id="hintImage" src="" alt="ヒント">
+            <button id="closeHintBtn" class="btn btn-primary">閉じる</button>
+        </div>
+    </div>
+
+    <!-- 紙吹雪エフェクト -->
+    <canvas id="confettiCanvas"></canvas>
+
+    <script src="canvas-draw.js"></script>
+    <script src="game.js"></script>
+</body>
+</html>
