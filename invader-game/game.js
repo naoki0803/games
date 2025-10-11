@@ -1,19 +1,39 @@
 // ゲーム設定
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
-canvas.width = 800;
-canvas.height = 600;
+
+// キャンバスサイズをデバイスに合わせて設定
+function setCanvasSize() {
+    const isMobile = window.innerWidth <= 768;
+    if (isMobile) {
+        // モバイル: 縦画面に最適化
+        canvas.width = Math.min(window.innerWidth - 20, 400);
+        canvas.height = Math.min(window.innerHeight - 250, 600);
+    } else {
+        // PC: 従来のサイズ
+        canvas.width = 800;
+        canvas.height = 600;
+    }
+}
+
+setCanvasSize();
+window.addEventListener('resize', setCanvasSize);
+
+// デバイス検出
+const isMobile = () => window.innerWidth <= 768;
 
 // ゲーム状態
 let gameState = 'ready'; // ready, playing, gameOver, win
 let score = 0;
 let lives = 3;
 let level = 1;
+let lastFireTime = 0;
+const fireDelay = 300; // 連射制限（ミリ秒）
 
 // プレイヤー
 const player = {
-    x: canvas.width / 2 - 25,
-    y: canvas.height - 60,
+    x: 0,
+    y: 0,
     width: 50,
     height: 30,
     speed: 5,
@@ -29,8 +49,8 @@ const bulletHeight = 15;
 
 // 敵
 let invaders = [];
-const invaderRows = 5;
-const invaderCols = 10;
+let invaderRows = 5;
+let invaderCols = 10;
 const invaderWidth = 40;
 const invaderHeight = 30;
 let invaderSpeed = 1;
@@ -48,7 +68,22 @@ function init() {
     lives = 3;
     bullets = [];
     enemyBullets = [];
-    player.x = canvas.width / 2 - 25;
+    
+    // プレイヤーの位置を初期化
+    player.x = canvas.width / 2 - player.width / 2;
+    player.y = canvas.height - 60;
+    
+    // モバイルでは敵の数を減らす
+    if (isMobile()) {
+        invaderRows = 4;
+        invaderCols = 6;
+        player.speed = 6; // 移動を少し速く
+    } else {
+        invaderRows = 5;
+        invaderCols = 10;
+        player.speed = 5;
+    }
+    
     invaderSpeed = 1 + (level - 1) * 0.3;
     createInvaders();
     updateDisplay();
@@ -57,18 +92,21 @@ function init() {
 // インベーダーを作成
 function createInvaders() {
     invaders = [];
-    const startX = 50;
-    const startY = 50;
-    const spacingX = 60;
-    const spacingY = 50;
+    
+    // キャンバスサイズに応じて調整
+    const scale = isMobile() ? 0.8 : 1;
+    const startX = isMobile() ? 20 : 50;
+    const startY = isMobile() ? 30 : 50;
+    const spacingX = isMobile() ? Math.floor((canvas.width - 40) / invaderCols) : 60;
+    const spacingY = isMobile() ? 40 : 50;
     
     for (let row = 0; row < invaderRows; row++) {
         for (let col = 0; col < invaderCols; col++) {
             invaders.push({
                 x: startX + col * spacingX,
                 y: startY + row * spacingY,
-                width: invaderWidth,
-                height: invaderHeight,
+                width: invaderWidth * scale,
+                height: invaderHeight * scale,
                 alive: true,
                 type: row // 種類を行番号で決定
             });
@@ -155,13 +193,13 @@ function updateInvaders() {
     let hitEdge = false;
     
     invaders.forEach(invader => {
-        if (invader.alive) {
-            invader.x += invaderSpeed * invaderDirection;
-            
-            if (invader.x <= 0 || invader.x >= canvas.width - invaderWidth) {
-                hitEdge = true;
+            if (invader.alive) {
+                invader.x += invaderSpeed * invaderDirection;
+                
+                if (invader.x <= 0 || invader.x >= canvas.width - invader.width) {
+                    hitEdge = true;
+                }
             }
-        }
     });
     
     if (hitEdge) {
@@ -178,8 +216,9 @@ function updateInvaders() {
         });
     }
     
-    // ランダムに敵が弾を撃つ
-    if (Math.random() < 0.01) {
+    // ランダムに敵が弾を撃つ（モバイルでは頻度を下げる）
+    const fireChance = isMobile() ? 0.008 : 0.01;
+    if (Math.random() < fireChance) {
         const aliveInvaders = invaders.filter(inv => inv.alive);
         if (aliveInvaders.length > 0) {
             const shooter = aliveInvaders[Math.floor(Math.random() * aliveInvaders.length)];
@@ -289,10 +328,15 @@ document.addEventListener('keydown', (e) => {
     }
     if (e.key === ' ' && gameState === 'playing') {
         e.preventDefault();
-        bullets.push({
-            x: player.x + player.width / 2 - bulletWidth / 2,
-            y: player.y
-        });
+        // 連射制限
+        const currentTime = Date.now();
+        if (currentTime - lastFireTime > fireDelay) {
+            bullets.push({
+                x: player.x + player.width / 2 - bulletWidth / 2,
+                y: player.y
+            });
+            lastFireTime = currentTime;
+        }
     }
     if (e.key === 'Enter') {
         if (gameState === 'ready') {
@@ -320,6 +364,123 @@ document.addEventListener('keyup', (e) => {
     }
 });
 
+// タッチ操作
+let touchStartX = 0;
+let touchStartY = 0;
+let isTouching = false;
+
+// キャンバスタッチイベント（移動用）
+canvas.addEventListener('touchstart', (e) => {
+    e.preventDefault();
+    const touch = e.touches[0];
+    const rect = canvas.getBoundingClientRect();
+    const touchX = touch.clientX - rect.left;
+    const touchY = touch.clientY - rect.top;
+    
+    touchStartX = touchX;
+    touchStartY = touchY;
+    isTouching = true;
+    
+    // タッチ位置に応じて移動方向を決定
+    const canvasCenter = canvas.width / 2;
+    if (touchX < canvasCenter) {
+        player.moveLeft = true;
+        player.moveRight = false;
+    } else {
+        player.moveRight = true;
+        player.moveLeft = false;
+    }
+});
+
+canvas.addEventListener('touchmove', (e) => {
+    e.preventDefault();
+    if (!isTouching) return;
+    
+    const touch = e.touches[0];
+    const rect = canvas.getBoundingClientRect();
+    const touchX = touch.clientX - rect.left;
+    
+    // タッチ位置に応じて移動方向を更新
+    const canvasCenter = canvas.width / 2;
+    if (touchX < canvasCenter) {
+        player.moveLeft = true;
+        player.moveRight = false;
+    } else {
+        player.moveRight = true;
+        player.moveLeft = false;
+    }
+});
+
+canvas.addEventListener('touchend', (e) => {
+    e.preventDefault();
+    player.moveLeft = false;
+    player.moveRight = false;
+    isTouching = false;
+});
+
+// 仮想ボタンのイベントリスナー
+function setupVirtualButtons() {
+    const leftBtn = document.getElementById('leftBtn');
+    const rightBtn = document.getElementById('rightBtn');
+    const fireBtn = document.getElementById('fireBtn');
+    const startBtn = document.getElementById('startBtn');
+    
+    // 左ボタン
+    leftBtn.addEventListener('touchstart', (e) => {
+        e.preventDefault();
+        player.moveLeft = true;
+    });
+    leftBtn.addEventListener('touchend', (e) => {
+        e.preventDefault();
+        player.moveLeft = false;
+    });
+    
+    // 右ボタン
+    rightBtn.addEventListener('touchstart', (e) => {
+        e.preventDefault();
+        player.moveRight = true;
+    });
+    rightBtn.addEventListener('touchend', (e) => {
+        e.preventDefault();
+        player.moveRight = false;
+    });
+    
+    // 発射ボタン
+    fireBtn.addEventListener('touchstart', (e) => {
+        e.preventDefault();
+        if (gameState === 'playing') {
+            // 連射制限
+            const currentTime = Date.now();
+            if (currentTime - lastFireTime > fireDelay) {
+                bullets.push({
+                    x: player.x + player.width / 2 - bulletWidth / 2,
+                    y: player.y
+                });
+                lastFireTime = currentTime;
+            }
+        }
+    });
+    
+    // スタートボタン
+    startBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        if (gameState === 'ready') {
+            gameState = 'playing';
+        } else if (gameState === 'gameOver') {
+            document.getElementById('gameOver').classList.add('hidden');
+            level = 1;
+            init();
+            gameState = 'playing';
+        } else if (gameState === 'win') {
+            document.getElementById('gameWin').classList.add('hidden');
+            level++;
+            init();
+            gameState = 'playing';
+        }
+    });
+}
+
 // ゲーム開始
 init();
+setupVirtualButtons();
 gameLoop();
