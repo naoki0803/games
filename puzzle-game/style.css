@@ -1,0 +1,622 @@
+/* ========================================
+   リセット & 基本設定
+   ======================================== */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+:root {
+    --primary-color: #667eea;
+    --secondary-color: #764ba2;
+    --success-color: #48bb78;
+    --warning-color: #f6ad55;
+    --danger-color: #f56565;
+    --dark: #2d3748;
+    --light: #f7fafc;
+    --shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    --shadow-lg: 0 10px 25px rgba(0, 0, 0, 0.15);
+    
+    /* Safe Area Insets for iPhone */
+    --safe-area-top: env(safe-area-inset-top);
+    --safe-area-bottom: env(safe-area-inset-bottom);
+    --safe-area-left: env(safe-area-inset-left);
+    --safe-area-right: env(safe-area-inset-right);
+}
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+    background: linear-gradient(135deg, var(--primary-color) 0%, var(--secondary-color) 100%);
+    color: var(--dark);
+    overflow-x: hidden;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    /* URLバー対応: dvh（dynamic viewport height）を使用 */
+    min-height: 100dvh;
+    /* Safariのバウンス効果を無効化 */
+    overscroll-behavior: none;
+    touch-action: pan-y;
+}
+
+/* ========================================
+   画面遷移システム
+   ======================================== */
+.screen {
+    display: none;
+    /* URLバー対応: dvhを使用し、セーフエリアを考慮 */
+    min-height: 100dvh;
+    padding: calc(var(--safe-area-top) + 20px) max(var(--safe-area-left), 20px) calc(var(--safe-area-bottom) + 80px) max(var(--safe-area-right), 20px);
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+}
+
+.screen.active {
+    display: flex;
+    flex-direction: column;
+    animation: fadeIn 0.3s ease-in;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: scale(0.95);
+    }
+    to {
+        opacity: 1;
+        transform: scale(1);
+    }
+}
+
+.container {
+    width: 100%;
+    max-width: 600px;
+    margin: 0 auto;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+/* ========================================
+   タイポグラフィ
+   ======================================== */
+.title {
+    font-size: clamp(2rem, 5vw, 3rem);
+    font-weight: 800;
+    color: white;
+    text-align: center;
+    text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.2);
+    margin-bottom: 10px;
+}
+
+.subtitle {
+    font-size: 1.1rem;
+    color: rgba(255, 255, 255, 0.9);
+    text-align: center;
+    margin-bottom: 20px;
+}
+
+.screen-title {
+    font-size: 1.8rem;
+    font-weight: 700;
+    color: white;
+    text-align: center;
+    margin-bottom: 20px;
+    text-shadow: 1px 1px 3px rgba(0, 0, 0, 0.2);
+}
+
+/* ========================================
+   カード
+   ======================================== */
+.card {
+    background: white;
+    border-radius: 20px;
+    padding: 30px;
+    box-shadow: var(--shadow-lg);
+    animation: slideUp 0.4s ease-out;
+}
+
+@keyframes slideUp {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.card h2 {
+    font-size: 1.5rem;
+    font-weight: 600;
+    color: var(--dark);
+    margin-bottom: 20px;
+    text-align: center;
+}
+
+/* ========================================
+   ボタン
+   ======================================== */
+.btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 14px 28px;
+    font-size: 1rem;
+    font-weight: 600;
+    border: none;
+    border-radius: 12px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    box-shadow: var(--shadow);
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+    /* Apple推奨の最小タップ領域 */
+    min-height: 44px;
+    min-width: 44px;
+}
+
+.btn:active {
+    transform: scale(0.95);
+}
+
+.btn-primary {
+    background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+    color: white;
+}
+
+.btn-primary:hover {
+    box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
+}
+
+.btn-secondary {
+    background: white;
+    color: var(--primary-color);
+    border: 2px solid var(--primary-color);
+}
+
+.btn-secondary:hover {
+    background: var(--light);
+}
+
+.btn-large {
+    font-size: 1.2rem;
+    padding: 18px 36px;
+}
+
+.btn-small {
+    font-size: 0.9rem;
+    padding: 8px 16px;
+    min-height: 36px;
+}
+
+.btn-tool {
+    background: var(--light);
+    color: var(--dark);
+}
+
+.button-group {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+    justify-content: center;
+}
+
+.button-group .btn {
+    flex: 1;
+    min-width: 140px;
+}
+
+.icon {
+    font-size: 1.2em;
+}
+
+/* ========================================
+   手描き画面
+   ======================================== */
+.canvas-container {
+    background: white;
+    border-radius: 16px;
+    padding: 10px;
+    box-shadow: var(--shadow-lg);
+    overflow: hidden;
+    touch-action: none;
+}
+
+#drawCanvas {
+    display: block;
+    width: 100%;
+    height: auto;
+    border: 2px solid #e2e8f0;
+    border-radius: 8px;
+    cursor: crosshair;
+    touch-action: none;
+}
+
+.draw-tools {
+    background: white;
+    border-radius: 16px;
+    padding: 20px;
+    box-shadow: var(--shadow);
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+}
+
+.tool-group {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.tool-group label {
+    font-weight: 600;
+    color: var(--dark);
+    min-width: 80px;
+}
+
+.tool-group input[type="range"] {
+    flex: 1;
+    height: 8px;
+    border-radius: 4px;
+    outline: none;
+}
+
+.tool-group input[type="color"] {
+    width: 60px;
+    height: 44px;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+}
+
+#penSizeValue {
+    font-weight: 600;
+    color: var(--primary-color);
+    min-width: 30px;
+}
+
+/* ========================================
+   プレビュー画面
+   ======================================== */
+.preview-container {
+    background: white;
+    border-radius: 16px;
+    padding: 20px;
+    box-shadow: var(--shadow-lg);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+#previewImage {
+    max-width: 100%;
+    max-height: 60vh;
+    border-radius: 12px;
+    box-shadow: var(--shadow);
+}
+
+/* ========================================
+   ゲーム画面
+   ======================================== */
+.game-container {
+    width: 100%;
+    max-width: 600px;
+    margin: 0 auto;
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+}
+
+.game-header {
+    background: rgba(255, 255, 255, 0.95);
+    border-radius: 16px;
+    padding: 15px;
+    box-shadow: var(--shadow);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.game-info {
+    display: flex;
+    gap: 20px;
+}
+
+.info-item {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.info-label {
+    font-size: 0.85rem;
+    color: #718096;
+    font-weight: 500;
+}
+
+.info-value {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: var(--primary-color);
+}
+
+.game-actions {
+    display: flex;
+    gap: 8px;
+}
+
+/* パズルボード */
+.puzzle-board {
+    background: white;
+    border-radius: 16px;
+    padding: 10px;
+    box-shadow: var(--shadow-lg);
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    grid-template-rows: repeat(5, 1fr);
+    gap: 4px;
+    aspect-ratio: 1;
+    max-width: 100%;
+    margin: 0 auto;
+    touch-action: none;
+}
+
+.puzzle-tile {
+    background-size: 500% 500%;
+    background-repeat: no-repeat;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    position: relative;
+    overflow: hidden;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+}
+
+.puzzle-tile:not(.empty):hover {
+    transform: scale(1.05);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+}
+
+.puzzle-tile:not(.empty):active {
+    transform: scale(0.98);
+}
+
+.puzzle-tile.empty {
+    background: #f7fafc;
+    cursor: default;
+    box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.puzzle-tile.moveable {
+    animation: pulse 0.6s infinite;
+}
+
+@keyframes pulse {
+    0%, 100% {
+        box-shadow: 0 0 0 0 rgba(102, 126, 234, 0.7);
+    }
+    50% {
+        box-shadow: 0 0 0 6px rgba(102, 126, 234, 0);
+    }
+}
+
+.game-footer {
+    display: flex;
+    justify-content: center;
+    /* URLバー対応: 下部に余白を確保 */
+    padding-bottom: 20px;
+}
+
+/* ========================================
+   完成画面
+   ======================================== */
+.celebration {
+    font-size: 5rem;
+    text-align: center;
+    animation: bounce 1s infinite;
+}
+
+@keyframes bounce {
+    0%, 100% {
+        transform: translateY(0);
+    }
+    50% {
+        transform: translateY(-20px);
+    }
+}
+
+.complete-title {
+    font-size: 2rem;
+    font-weight: 700;
+    color: white;
+    text-align: center;
+    text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.complete-message {
+    font-size: 1.2rem;
+    color: rgba(255, 255, 255, 0.9);
+    text-align: center;
+    margin-bottom: 20px;
+}
+
+.result-card {
+    background: white;
+    border-radius: 16px;
+    padding: 20px;
+    box-shadow: var(--shadow-lg);
+    display: flex;
+    justify-content: space-around;
+    margin-bottom: 20px;
+}
+
+.result-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+}
+
+.result-label {
+    font-size: 0.9rem;
+    color: #718096;
+    font-weight: 500;
+}
+
+.result-value {
+    font-size: 2rem;
+    font-weight: 700;
+    color: var(--primary-color);
+}
+
+.complete-image-container {
+    background: white;
+    border-radius: 16px;
+    padding: 20px;
+    box-shadow: var(--shadow-lg);
+    display: flex;
+    justify-content: center;
+}
+
+#completeImage {
+    max-width: 100%;
+    max-height: 40vh;
+    border-radius: 12px;
+    box-shadow: var(--shadow);
+}
+
+/* ========================================
+   モーダル
+   ======================================== */
+.modal {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.8);
+    z-index: 1000;
+    justify-content: center;
+    align-items: center;
+    padding: 20px;
+    /* セーフエリア対応 */
+    padding-top: calc(var(--safe-area-top) + 20px);
+    padding-bottom: calc(var(--safe-area-bottom) + 20px);
+}
+
+.modal.active {
+    display: flex;
+    animation: fadeIn 0.3s ease-in;
+}
+
+.modal-content {
+    background: white;
+    border-radius: 20px;
+    padding: 30px;
+    max-width: 90%;
+    max-height: 90%;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    align-items: center;
+    box-shadow: var(--shadow-lg);
+}
+
+.modal-content h3 {
+    font-size: 1.5rem;
+    font-weight: 600;
+    color: var(--dark);
+}
+
+#hintImage {
+    max-width: 100%;
+    max-height: 60vh;
+    border-radius: 12px;
+    box-shadow: var(--shadow);
+}
+
+/* ========================================
+   紙吹雪エフェクト
+   ======================================== */
+#confettiCanvas {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    z-index: 999;
+}
+
+/* ========================================
+   レスポンシブ対応
+   ======================================== */
+@media (max-width: 480px) {
+    .title {
+        font-size: 2rem;
+    }
+    
+    .card {
+        padding: 20px;
+    }
+    
+    .btn {
+        padding: 12px 20px;
+        font-size: 0.95rem;
+    }
+    
+    .button-group .btn {
+        min-width: 120px;
+    }
+    
+    .game-header {
+        padding: 12px;
+    }
+    
+    .info-value {
+        font-size: 1.3rem;
+    }
+    
+    .result-value {
+        font-size: 1.5rem;
+    }
+}
+
+/* 横向き対応 */
+@media (orientation: landscape) and (max-height: 600px) {
+    .screen {
+        padding-top: 10px;
+        padding-bottom: 60px;
+    }
+    
+    .title {
+        font-size: 1.8rem;
+        margin-bottom: 5px;
+    }
+    
+    .subtitle {
+        font-size: 1rem;
+        margin-bottom: 10px;
+    }
+    
+    .card {
+        padding: 20px;
+    }
+    
+    #previewImage {
+        max-height: 50vh;
+    }
+}
+
+/* ダークモード対応（オプション） */
+@media (prefers-color-scheme: dark) {
+    /* 必要に応じてダークモード対応 */
+}
