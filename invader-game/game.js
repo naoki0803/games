@@ -61,6 +61,22 @@ let invaderDropDistance = 15;
 let enemyBullets = [];
 const enemyBulletSpeed = 3;
 
+// パワーアップアイテム
+let powerUps = [];
+const powerUpSpeed = 2;
+const powerUpTypes = [
+    { type: 'attack', color: '#ff0000', label: 'P', effect: 'パワーアップ' },
+    { type: 'speed', color: '#00ff00', label: 'S', effect: 'スピードアップ' },
+    { type: 'shield', color: '#0088ff', label: 'B', effect: 'バリア' }
+];
+
+// プレイヤーのパワーアップ状態
+let playerPowerUps = {
+    attack: { active: false, timer: 0, duration: 10000, multiplier: 2 },
+    speed: { active: false, timer: 0, duration: 10000, speedBonus: 3 },
+    shield: { active: false, timer: 0, duration: 8000 }
+};
+
 // パーティクル（爆発エフェクト）
 let particles = [];
 
@@ -110,7 +126,16 @@ function init() {
     lives = 3;
     bullets = [];
     enemyBullets = [];
+    powerUps = [];
     particles = [];
+    
+    // パワーアップをリセット
+    playerPowerUps.attack.active = false;
+    playerPowerUps.attack.timer = 0;
+    playerPowerUps.speed.active = false;
+    playerPowerUps.speed.timer = 0;
+    playerPowerUps.shield.active = false;
+    playerPowerUps.shield.timer = 0;
     
     // プレイヤーの位置を初期化
     player.x = canvas.width / 2 - player.width / 2;
@@ -126,6 +151,9 @@ function init() {
         invaderCols = 12;
         player.speed = 5;
     }
+    
+    // ベース速度を記録
+    player.baseSpeed = player.speed;
     
     invaderSpeed = 0.7 + (level - 1) * 0.2;
     createInvaders();
@@ -160,18 +188,52 @@ function createInvaders() {
 
 // プレイヤーを描画
 function drawPlayer() {
+    // バリアエフェクト（アクティブな場合）
+    if (playerPowerUps.shield.active) {
+        const shieldRadius = 30;
+        const shieldGradient = ctx.createRadialGradient(
+            player.x + player.width / 2, player.y + player.height / 2, shieldRadius * 0.5,
+            player.x + player.width / 2, player.y + player.height / 2, shieldRadius
+        );
+        shieldGradient.addColorStop(0, 'rgba(0, 136, 255, 0.3)');
+        shieldGradient.addColorStop(0.7, 'rgba(0, 136, 255, 0.5)');
+        shieldGradient.addColorStop(1, 'rgba(0, 136, 255, 0.1)');
+        
+        ctx.fillStyle = shieldGradient;
+        ctx.beginPath();
+        ctx.arc(
+            player.x + player.width / 2, 
+            player.y + player.height / 2, 
+            shieldRadius + Math.sin(animationFrame * 0.1) * 3, 
+            0, 
+            Math.PI * 2
+        );
+        ctx.fill();
+        
+        // バリアの境界線
+        ctx.strokeStyle = 'rgba(0, 200, 255, 0.8)';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+    }
+    
     // 影
     ctx.shadowBlur = 15;
-    ctx.shadowColor = '#00ff00';
+    ctx.shadowColor = playerPowerUps.attack.active ? '#ff0000' : '#00ff00';
     
-    // グラデーション
+    // グラデーション（攻撃力アップ時は赤色に）
     const gradient = ctx.createLinearGradient(
         player.x + player.width / 2, player.y,
         player.x + player.width / 2, player.y + player.height
     );
-    gradient.addColorStop(0, '#00ff00');
-    gradient.addColorStop(0.5, '#00dd00');
-    gradient.addColorStop(1, '#00aa00');
+    if (playerPowerUps.attack.active) {
+        gradient.addColorStop(0, '#ff0000');
+        gradient.addColorStop(0.5, '#dd0000');
+        gradient.addColorStop(1, '#aa0000');
+    } else {
+        gradient.addColorStop(0, '#00ff00');
+        gradient.addColorStop(0.5, '#00dd00');
+        gradient.addColorStop(1, '#00aa00');
+    }
     
     ctx.fillStyle = gradient;
     // 宇宙船の形
@@ -182,11 +244,12 @@ function drawPlayer() {
     ctx.closePath();
     ctx.fill();
     
-    // エンジン炎のアニメーション
+    // エンジン炎のアニメーション（スピードアップ時は大きく）
+    const flameSize = playerPowerUps.speed.active ? 12 : 8;
     if (gameState === 'playing' && Math.floor(animationFrame / 5) % 2 === 0) {
         const flameGradient = ctx.createLinearGradient(
             player.x + player.width / 2, player.y + player.height,
-            player.x + player.width / 2, player.y + player.height + 8
+            player.x + player.width / 2, player.y + player.height + flameSize
         );
         flameGradient.addColorStop(0, 'rgba(255, 200, 0, 0.9)');
         flameGradient.addColorStop(0.5, 'rgba(255, 100, 0, 0.7)');
@@ -195,7 +258,7 @@ function drawPlayer() {
         ctx.fillStyle = flameGradient;
         ctx.beginPath();
         ctx.moveTo(player.x + player.width / 2 - 5, player.y + player.height);
-        ctx.lineTo(player.x + player.width / 2, player.y + player.height + 8);
+        ctx.lineTo(player.x + player.width / 2, player.y + player.height + flameSize);
         ctx.lineTo(player.x + player.width / 2 + 5, player.y + player.height);
         ctx.closePath();
         ctx.fill();
@@ -290,22 +353,73 @@ function drawParticles() {
     ctx.shadowBlur = 0;
 }
 
+// パワーアップアイテムを描画
+function drawPowerUps() {
+    powerUps.forEach(powerUp => {
+        const size = 20;
+        const x = powerUp.x;
+        const y = powerUp.y;
+        
+        // グロー効果
+        ctx.shadowBlur = 15;
+        ctx.shadowColor = powerUp.color;
+        
+        // 外側の円（回転するリング）
+        ctx.strokeStyle = powerUp.color;
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.arc(x, y, size, animationFrame * 0.05, animationFrame * 0.05 + Math.PI * 1.5);
+        ctx.stroke();
+        
+        // 内側の円
+        const gradient = ctx.createRadialGradient(x, y, 0, x, y, size * 0.7);
+        gradient.addColorStop(0, powerUp.color);
+        gradient.addColorStop(1, 'rgba(0, 0, 0, 0.5)');
+        ctx.fillStyle = gradient;
+        ctx.beginPath();
+        ctx.arc(x, y, size * 0.7, 0, Math.PI * 2);
+        ctx.fill();
+        
+        // アイコンラベル
+        ctx.shadowBlur = 5;
+        ctx.fillStyle = '#ffffff';
+        ctx.font = 'bold 16px Arial';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(powerUp.label, x, y);
+        
+        ctx.shadowBlur = 0;
+    });
+}
+
 // 弾丸を描画
 function drawBullets() {
     // プレイヤーの弾丸（グロー効果付き）
     bullets.forEach(bullet => {
+        // 攻撃力アップ時は弾丸を大きく
+        const width = playerPowerUps.attack.active ? bulletWidth * 2 : bulletWidth;
+        const height = playerPowerUps.attack.active ? bulletHeight * 1.5 : bulletHeight;
+        
         const gradient = ctx.createLinearGradient(
             bullet.x, bullet.y,
-            bullet.x, bullet.y + bulletHeight
+            bullet.x, bullet.y + height
         );
-        gradient.addColorStop(0, '#00ff00');
-        gradient.addColorStop(0.5, '#00ff88');
-        gradient.addColorStop(1, '#00ffff');
+        
+        if (playerPowerUps.attack.active) {
+            gradient.addColorStop(0, '#ff0000');
+            gradient.addColorStop(0.5, '#ff8800');
+            gradient.addColorStop(1, '#ffff00');
+            ctx.shadowColor = '#ff0000';
+        } else {
+            gradient.addColorStop(0, '#00ff00');
+            gradient.addColorStop(0.5, '#00ff88');
+            gradient.addColorStop(1, '#00ffff');
+            ctx.shadowColor = '#00ff00';
+        }
         
         ctx.shadowBlur = 10;
-        ctx.shadowColor = '#00ff00';
         ctx.fillStyle = gradient;
-        ctx.fillRect(bullet.x, bullet.y, bulletWidth, bulletHeight);
+        ctx.fillRect(bullet.x - (width - bulletWidth) / 2, bullet.y, width, height);
     });
     
     // 敵の弾丸（グロー効果付き）
@@ -329,11 +443,46 @@ function drawBullets() {
 
 // プレイヤーを更新
 function updatePlayer() {
+    // スピードアップ効果を適用
+    const currentSpeed = playerPowerUps.speed.active 
+        ? player.baseSpeed + playerPowerUps.speed.speedBonus 
+        : player.baseSpeed;
+    
     if (player.moveLeft && player.x > 0) {
-        player.x -= player.speed;
+        player.x -= currentSpeed;
     }
     if (player.moveRight && player.x < canvas.width - player.width) {
-        player.x += player.speed;
+        player.x += currentSpeed;
+    }
+}
+
+// パワーアップを更新
+function updatePowerUps() {
+    // パワーアップアイテムの移動
+    powerUps = powerUps.filter(powerUp => {
+        powerUp.y += powerUpSpeed;
+        return powerUp.y < canvas.height + 30;
+    });
+    
+    // パワーアップタイマーを更新
+    const currentTime = Date.now();
+    
+    if (playerPowerUps.attack.active) {
+        if (currentTime - playerPowerUps.attack.timer > playerPowerUps.attack.duration) {
+            playerPowerUps.attack.active = false;
+        }
+    }
+    
+    if (playerPowerUps.speed.active) {
+        if (currentTime - playerPowerUps.speed.timer > playerPowerUps.speed.duration) {
+            playerPowerUps.speed.active = false;
+        }
+    }
+    
+    if (playerPowerUps.shield.active) {
+        if (currentTime - playerPowerUps.shield.timer > playerPowerUps.shield.duration) {
+            playerPowerUps.shield.active = false;
+        }
     }
 }
 
@@ -409,11 +558,16 @@ function checkCollisions() {
     // プレイヤーの弾丸とインベーダー
     bullets.forEach((bullet, bulletIndex) => {
         invaders.forEach(invader => {
+            // 攻撃力アップ時は弾丸サイズが大きい
+            const currentBulletWidth = playerPowerUps.attack.active ? bulletWidth * 2 : bulletWidth;
+            const currentBulletHeight = playerPowerUps.attack.active ? bulletHeight * 1.5 : bulletHeight;
+            const bulletX = bullet.x - (currentBulletWidth - bulletWidth) / 2;
+            
             if (invader.alive &&
-                bullet.x < invader.x + invader.width &&
-                bullet.x + bulletWidth > invader.x &&
+                bulletX < invader.x + invader.width &&
+                bulletX + currentBulletWidth > invader.x &&
                 bullet.y < invader.y + invader.height &&
-                bullet.y + bulletHeight > invader.y) {
+                bullet.y + currentBulletHeight > invader.y) {
                 
                 invader.alive = false;
                 bullets.splice(bulletIndex, 1);
@@ -433,6 +587,19 @@ function checkCollisions() {
                     colors[invader.type]
                 );
                 
+                // パワーアップをランダムでドロップ（25%の確率）
+                if (Math.random() < 0.25) {
+                    const powerUpType = powerUpTypes[Math.floor(Math.random() * powerUpTypes.length)];
+                    powerUps.push({
+                        x: invader.x + invader.width / 2,
+                        y: invader.y + invader.height / 2,
+                        type: powerUpType.type,
+                        color: powerUpType.color,
+                        label: powerUpType.label,
+                        effect: powerUpType.effect
+                    });
+                }
+                
                 updateDisplay();
                 
                 // 全滅チェック
@@ -443,6 +610,23 @@ function checkCollisions() {
         });
     });
     
+    // プレイヤーとパワーアップアイテムの衝突
+    powerUps.forEach((powerUp, index) => {
+        const distance = Math.sqrt(
+            Math.pow(powerUp.x - (player.x + player.width / 2), 2) +
+            Math.pow(powerUp.y - (player.y + player.height / 2), 2)
+        );
+        
+        if (distance < 30) {
+            // パワーアップを取得
+            activatePowerUp(powerUp.type);
+            powerUps.splice(index, 1);
+            
+            // 取得エフェクト
+            createExplosion(powerUp.x, powerUp.y, powerUp.color.replace('#', '').match(/.{2}/g).map(x => parseInt(x, 16)).join(', '));
+        }
+    });
+    
     // 敵の弾丸とプレイヤー
     enemyBullets.forEach((bullet, bulletIndex) => {
         if (bullet.x < player.x + player.width &&
@@ -451,22 +635,53 @@ function checkCollisions() {
             bullet.y + bulletHeight > player.y) {
             
             enemyBullets.splice(bulletIndex, 1);
-            lives--;
             
-            // プレイヤーが被弾した時の爆発エフェクト
-            createExplosion(
-                player.x + player.width / 2,
-                player.y + player.height / 2,
-                '255, 0, 0'
-            );
-            
-            updateDisplay();
-            
-            if (lives <= 0) {
-                gameOver();
+            // バリアがアクティブな場合はダメージを受けない
+            if (!playerPowerUps.shield.active) {
+                lives--;
+                
+                // プレイヤーが被弾した時の爆発エフェクト
+                createExplosion(
+                    player.x + player.width / 2,
+                    player.y + player.height / 2,
+                    '255, 0, 0'
+                );
+                
+                updateDisplay();
+                
+                if (lives <= 0) {
+                    gameOver();
+                }
+            } else {
+                // バリアで防いだエフェクト
+                createExplosion(
+                    player.x + player.width / 2,
+                    player.y + player.height / 2,
+                    '0, 136, 255'
+                );
             }
         }
     });
+}
+
+// パワーアップを有効化
+function activatePowerUp(type) {
+    const currentTime = Date.now();
+    
+    switch(type) {
+        case 'attack':
+            playerPowerUps.attack.active = true;
+            playerPowerUps.attack.timer = currentTime;
+            break;
+        case 'speed':
+            playerPowerUps.speed.active = true;
+            playerPowerUps.speed.timer = currentTime;
+            break;
+        case 'shield':
+            playerPowerUps.shield.active = true;
+            playerPowerUps.shield.timer = currentTime;
+            break;
+    }
 }
 
 // 画面表示を更新
@@ -503,6 +718,7 @@ function gameLoop() {
         updatePlayer();
         updateBullets();
         updateInvaders();
+        updatePowerUps();
         updateParticles();
         checkCollisions();
     } else {
@@ -512,7 +728,11 @@ function gameLoop() {
     drawPlayer();
     drawInvaders();
     drawBullets();
+    drawPowerUps();
     drawParticles();
+    
+    // パワーアップステータス表示
+    drawPowerUpStatus();
     
     // ゲーム状態テキスト
     if (gameState === 'ready') {
@@ -526,6 +746,43 @@ function gameLoop() {
     }
     
     requestAnimationFrame(gameLoop);
+}
+
+// パワーアップのステータスを表示
+function drawPowerUpStatus() {
+    const currentTime = Date.now();
+    let yOffset = 10;
+    
+    ctx.font = 'bold 14px Arial';
+    ctx.textAlign = 'left';
+    
+    if (playerPowerUps.attack.active) {
+        const remaining = Math.ceil((playerPowerUps.attack.duration - (currentTime - playerPowerUps.attack.timer)) / 1000);
+        ctx.fillStyle = '#ff0000';
+        ctx.shadowBlur = 5;
+        ctx.shadowColor = '#ff0000';
+        ctx.fillText(`⚡ パワーアップ: ${remaining}秒`, 10, yOffset);
+        yOffset += 20;
+    }
+    
+    if (playerPowerUps.speed.active) {
+        const remaining = Math.ceil((playerPowerUps.speed.duration - (currentTime - playerPowerUps.speed.timer)) / 1000);
+        ctx.fillStyle = '#00ff00';
+        ctx.shadowBlur = 5;
+        ctx.shadowColor = '#00ff00';
+        ctx.fillText(`⚡ スピードアップ: ${remaining}秒`, 10, yOffset);
+        yOffset += 20;
+    }
+    
+    if (playerPowerUps.shield.active) {
+        const remaining = Math.ceil((playerPowerUps.shield.duration - (currentTime - playerPowerUps.shield.timer)) / 1000);
+        ctx.fillStyle = '#0088ff';
+        ctx.shadowBlur = 5;
+        ctx.shadowColor = '#0088ff';
+        ctx.fillText(`🛡️ バリア: ${remaining}秒`, 10, yOffset);
+    }
+    
+    ctx.shadowBlur = 0;
 }
 
 // キーボードイベント
