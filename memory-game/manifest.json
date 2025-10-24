@@ -1,12 +1,12 @@
 {
-  "name": "ゲームコレクション",
-  "short_name": "ゲーム集",
-  "description": "楽しいゲームのコレクション - スペースインベーダー、スライディングパズル、神経衰弱",
+  "name": "神経衰弱ゲーム",
+  "short_name": "神経衰弱",
+  "description": "楽しい神経衰弱カードゲーム",
   "start_url": "./index.html",
   "display": "standalone",
   "background_color": "#667eea",
   "theme_color": "#667eea",
-  "orientation": "any",
+  "orientation": "portrait",
   "icons": [
     {
       "src": "/icon-192.png",

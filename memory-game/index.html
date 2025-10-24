@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="神経衰弱">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="theme-color" content="#667eea">
+    <title>神経衰弱ゲーム</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="manifest" href="manifest.json">
+</head>
+<body>
+    <div class="game-container">
+        <!-- ヘッダー -->
+        <header class="header">
+            <h1>🎴 神経衰弱</h1>
+            <div class="header-info">
+                <div class="info-item">
+                    <span class="label">時間:</span>
+                    <span id="timer" class="value">00:00</span>
+                </div>
+                <div class="info-item">
+                    <span class="label">手数:</span>
+                    <span id="moves" class="value">0</span>
+                </div>
+                <div class="info-item">
+                    <span class="label">ペア:</span>
+                    <span id="pairs" class="value">0/8</span>
+                </div>
+            </div>
+        </header>
+
+        <!-- スタート画面 -->
+        <div id="startScreen" class="screen active">
+            <div class="start-content">
+                <div class="game-icon">🧠</div>
+                <h2>神経衰弱ゲーム</h2>
+                <p class="description">同じ絵柄のカードを見つけよう！</p>
+                
+                <div class="difficulty-selector">
+                    <h3>難易度を選択</h3>
+                    <div class="difficulty-buttons">
+                        <button class="difficulty-btn" data-level="easy">
+                            <span class="emoji">😊</span>
+                            <span class="level-name">簡単</span>
+                            <span class="level-desc">4x4 (8ペア)</span>
+                        </button>
+                        <button class="difficulty-btn active" data-level="medium">
+                            <span class="emoji">🤔</span>
+                            <span class="level-name">普通</span>
+                            <span class="level-desc">4x4 (8ペア)</span>
+                        </button>
+                        <button class="difficulty-btn" data-level="hard">
+                            <span class="emoji">😤</span>
+                            <span class="level-name">難しい</span>
+                            <span class="level-desc">6x6 (18ペア)</span>
+                        </button>
+                    </div>
+                </div>
+
+                <button id="startBtn" class="btn btn-primary btn-large">ゲームスタート</button>
+            </div>
+        </div>
+
+        <!-- ゲーム画面 -->
+        <div id="gameScreen" class="screen">
+            <div id="cardBoard" class="card-board">
+                <!-- カードが動的に生成される -->
+            </div>
+            
+            <div class="game-controls">
+                <button id="restartBtn" class="btn btn-secondary">🔄 リスタート</button>
+                <button id="backToMenuBtn" class="btn btn-secondary">← メニュー</button>
+            </div>
+        </div>
+
+        <!-- クリア画面 -->
+        <div id="clearScreen" class="screen">
+            <div class="clear-content">
+                <div class="celebration">🎉</div>
+                <h2>おめでとうございます！</h2>
+                <p class="clear-message">すべてのペアを見つけました！</p>
+                
+                <div class="result-card">
+                    <div class="result-item">
+                        <span class="result-label">⏱️ 時間:</span>
+                        <span id="finalTime" class="result-value">00:00</span>
+                    </div>
+                    <div class="result-item">
+                        <span class="result-label">👆 手数:</span>
+                        <span id="finalMoves" class="result-value">0</span>
+                    </div>
+                    <div class="result-item">
+                        <span class="result-label">⭐ スコア:</span>
+                        <span id="finalScore" class="result-value">0</span>
+                    </div>
+                </div>
+                
+                <div class="button-group">
+                    <button id="playAgainBtn" class="btn btn-primary">もう一度</button>
+                    <button id="changeDifficultyBtn" class="btn btn-secondary">難易度変更</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 紙吹雪エフェクト -->
+    <canvas id="confettiCanvas"></canvas>
+
+    <script src="game.js"></script>
+    <script>
+        // Service Worker登録
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('./service-worker.js')
+                    .then((registration) => {
+                        console.log('Service Worker登録成功:', registration);
+                    })
+                    .catch((error) => {
+                        console.log('Service Worker登録失敗:', error);
+                    });
+            });
+        }
+    </script>
+</body>
+</html>

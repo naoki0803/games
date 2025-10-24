@@ -1,0 +1,491 @@
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+:root {
+    --primary-color: #667eea;
+    --secondary-color: #764ba2;
+    --success-color: #48bb78;
+    --warning-color: #f6ad55;
+    --danger-color: #fc8181;
+    --bg-gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    --card-bg: #ffffff;
+    --card-back: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    --text-color: #2d3748;
+    --text-light: #718096;
+    --shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+    --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background: var(--bg-gradient);
+    min-height: 100vh;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 20px;
+    color: var(--text-color);
+}
+
+.game-container {
+    width: 100%;
+    max-width: 800px;
+    position: relative;
+}
+
+/* ヘッダー */
+.header {
+    background: rgba(255, 255, 255, 0.95);
+    border-radius: 20px;
+    padding: 20px 30px;
+    margin-bottom: 20px;
+    box-shadow: var(--shadow-sm);
+    backdrop-filter: blur(10px);
+}
+
+.header h1 {
+    font-size: 2rem;
+    color: var(--primary-color);
+    text-align: center;
+    margin-bottom: 15px;
+}
+
+.header-info {
+    display: flex;
+    justify-content: space-around;
+    gap: 20px;
+}
+
+.info-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 5px;
+}
+
+.info-item .label {
+    font-size: 0.85rem;
+    color: var(--text-light);
+    font-weight: 500;
+}
+
+.info-item .value {
+    font-size: 1.25rem;
+    font-weight: bold;
+    color: var(--primary-color);
+}
+
+/* 画面切り替え */
+.screen {
+    display: none;
+    animation: fadeIn 0.5s ease-in-out;
+}
+
+.screen.active {
+    display: block;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* スタート画面 */
+.start-content {
+    background: rgba(255, 255, 255, 0.95);
+    border-radius: 20px;
+    padding: 40px;
+    text-align: center;
+    box-shadow: var(--shadow);
+    backdrop-filter: blur(10px);
+}
+
+.game-icon {
+    font-size: 5rem;
+    margin-bottom: 20px;
+    animation: bounce 2s infinite;
+}
+
+@keyframes bounce {
+    0%, 100% {
+        transform: translateY(0);
+    }
+    50% {
+        transform: translateY(-20px);
+    }
+}
+
+.start-content h2 {
+    font-size: 2rem;
+    color: var(--primary-color);
+    margin-bottom: 10px;
+}
+
+.description {
+    font-size: 1.1rem;
+    color: var(--text-light);
+    margin-bottom: 30px;
+}
+
+/* 難易度選択 */
+.difficulty-selector {
+    margin: 30px 0;
+}
+
+.difficulty-selector h3 {
+    color: var(--text-color);
+    margin-bottom: 20px;
+    font-size: 1.2rem;
+}
+
+.difficulty-buttons {
+    display: flex;
+    gap: 15px;
+    justify-content: center;
+    flex-wrap: wrap;
+}
+
+.difficulty-btn {
+    background: white;
+    border: 3px solid #e2e8f0;
+    border-radius: 15px;
+    padding: 20px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    min-width: 140px;
+}
+
+.difficulty-btn:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 5px 20px rgba(102, 126, 234, 0.3);
+}
+
+.difficulty-btn.active {
+    border-color: var(--primary-color);
+    background: linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.1) 100%);
+}
+
+.difficulty-btn .emoji {
+    font-size: 2.5rem;
+}
+
+.difficulty-btn .level-name {
+    font-weight: bold;
+    font-size: 1.1rem;
+    color: var(--text-color);
+}
+
+.difficulty-btn .level-desc {
+    font-size: 0.85rem;
+    color: var(--text-light);
+}
+
+/* カードボード */
+.card-board {
+    display: grid;
+    gap: 15px;
+    padding: 20px;
+    background: rgba(255, 255, 255, 0.95);
+    border-radius: 20px;
+    box-shadow: var(--shadow);
+    backdrop-filter: blur(10px);
+    margin-bottom: 20px;
+}
+
+.card-board.grid-4x4 {
+    grid-template-columns: repeat(4, 1fr);
+}
+
+.card-board.grid-6x6 {
+    grid-template-columns: repeat(6, 1fr);
+}
+
+/* カード */
+.card {
+    aspect-ratio: 1;
+    position: relative;
+    cursor: pointer;
+    perspective: 1000px;
+}
+
+.card-inner {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    transition: transform 0.6s;
+    transform-style: preserve-3d;
+}
+
+.card.flipped .card-inner {
+    transform: rotateY(180deg);
+}
+
+.card.matched .card-inner {
+    transform: rotateY(180deg);
+}
+
+.card-face {
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    backface-visibility: hidden;
+    border-radius: 15px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 3rem;
+    box-shadow: var(--shadow-sm);
+}
+
+.card-back {
+    background: var(--card-back);
+    color: white;
+}
+
+.card-back::after {
+    content: '?';
+    font-size: 4rem;
+    font-weight: bold;
+    text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+.card-front {
+    background: white;
+    transform: rotateY(180deg);
+    border: 3px solid #e2e8f0;
+}
+
+.card.matched .card-front {
+    border-color: var(--success-color);
+    background: linear-gradient(135deg, rgba(72, 187, 120, 0.1) 0%, rgba(72, 187, 120, 0.2) 100%);
+}
+
+.card:not(.flipped):not(.matched):hover {
+    transform: translateY(-5px);
+}
+
+/* ボタン */
+.btn {
+    padding: 12px 30px;
+    border: none;
+    border-radius: 10px;
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    box-shadow: var(--shadow-sm);
+}
+
+.btn-primary {
+    background: var(--bg-gradient);
+    color: white;
+}
+
+.btn-primary:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 5px 20px rgba(102, 126, 234, 0.4);
+}
+
+.btn-secondary {
+    background: white;
+    color: var(--primary-color);
+    border: 2px solid var(--primary-color);
+}
+
+.btn-secondary:hover {
+    background: var(--primary-color);
+    color: white;
+}
+
+.btn-large {
+    padding: 15px 50px;
+    font-size: 1.2rem;
+}
+
+.game-controls {
+    display: flex;
+    gap: 15px;
+    justify-content: center;
+}
+
+/* クリア画面 */
+.clear-content {
+    background: rgba(255, 255, 255, 0.95);
+    border-radius: 20px;
+    padding: 40px;
+    text-align: center;
+    box-shadow: var(--shadow);
+    backdrop-filter: blur(10px);
+}
+
+.celebration {
+    font-size: 5rem;
+    margin-bottom: 20px;
+    animation: rotate 2s ease-in-out;
+}
+
+@keyframes rotate {
+    0% {
+        transform: rotate(0deg) scale(0);
+    }
+    50% {
+        transform: rotate(180deg) scale(1.2);
+    }
+    100% {
+        transform: rotate(360deg) scale(1);
+    }
+}
+
+.clear-content h2 {
+    font-size: 2rem;
+    color: var(--primary-color);
+    margin-bottom: 10px;
+}
+
+.clear-message {
+    font-size: 1.1rem;
+    color: var(--text-light);
+    margin-bottom: 30px;
+}
+
+.result-card {
+    background: linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.1) 100%);
+    border-radius: 15px;
+    padding: 25px;
+    margin-bottom: 30px;
+}
+
+.result-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 0;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+}
+
+.result-item:last-child {
+    border-bottom: none;
+}
+
+.result-label {
+    font-size: 1.1rem;
+    color: var(--text-color);
+    font-weight: 500;
+}
+
+.result-value {
+    font-size: 1.3rem;
+    font-weight: bold;
+    color: var(--primary-color);
+}
+
+.button-group {
+    display: flex;
+    gap: 15px;
+    justify-content: center;
+    flex-wrap: wrap;
+}
+
+/* 紙吹雪 */
+#confettiCanvas {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    z-index: 9999;
+}
+
+/* レスポンシブ対応 */
+@media (max-width: 768px) {
+    .header h1 {
+        font-size: 1.5rem;
+    }
+
+    .header-info {
+        gap: 10px;
+    }
+
+    .info-item .label {
+        font-size: 0.75rem;
+    }
+
+    .info-item .value {
+        font-size: 1rem;
+    }
+
+    .start-content,
+    .clear-content {
+        padding: 30px 20px;
+    }
+
+    .game-icon {
+        font-size: 4rem;
+    }
+
+    .difficulty-buttons {
+        flex-direction: column;
+    }
+
+    .difficulty-btn {
+        width: 100%;
+    }
+
+    .card-board {
+        gap: 10px;
+        padding: 15px;
+    }
+
+    .card-face {
+        font-size: 2rem;
+    }
+
+    .card-back::after {
+        font-size: 2.5rem;
+    }
+
+    .game-controls {
+        flex-direction: column;
+    }
+
+    .game-controls .btn {
+        width: 100%;
+    }
+}
+
+@media (max-width: 480px) {
+    body {
+        padding: 10px;
+    }
+
+    .header {
+        padding: 15px 20px;
+    }
+
+    .card-board.grid-6x6 {
+        gap: 5px;
+        padding: 10px;
+    }
+
+    .card-face {
+        font-size: 1.5rem;
+    }
+
+    .card-back::after {
+        font-size: 2rem;
+    }
+}
