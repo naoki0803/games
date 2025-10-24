@@ -12,9 +12,9 @@ function setCanvasSize() {
         const viewportHeight = window.visualViewport ? window.visualViewport.height : window.innerHeight;
         
         canvas.width = Math.min(window.innerWidth - 20, 400);
-        // ヘッダー（約80px）、コントロール（約180px）、余白（約30px）を考慮
+        // ヘッダー（約70px）、フリックコントローラー（約160px）、余白（約20px）を考慮
         // より余裕を持たせて見切れを防ぐ
-        canvas.height = Math.max(Math.min(viewportHeight - 300, 600), 350);
+        canvas.height = Math.max(Math.min(viewportHeight - 260, 600), 350);
     } else {
         // PC: 従来のサイズ
         canvas.width = 800;
@@ -864,32 +864,99 @@ canvas.addEventListener('touchend', (e) => {
     isTouching = false;
 });
 
-// 仮想ボタンのイベントリスナー
-function setupVirtualButtons() {
-    const leftBtn = document.getElementById('leftBtn');
-    const rightBtn = document.getElementById('rightBtn');
-    const fireBtn = document.getElementById('fireBtn');
-    const startBtn = document.getElementById('startBtn');
+// フリックコントローラーのセットアップ
+function setupFlickController() {
+    const flickController = document.getElementById('flickController');
+    const flickIndicator = document.getElementById('flickIndicator');
     
-    // 左ボタン
-    leftBtn.addEventListener('touchstart', (e) => {
+    let touchStartPos = { x: 0, y: 0 };
+    let isTouchingFlick = false;
+    let controllerCenter = { x: 0, y: 0 };
+    
+    flickController.addEventListener('touchstart', (e) => {
         e.preventDefault();
-        player.moveLeft = true;
+        const touch = e.touches[0];
+        const rect = flickController.getBoundingClientRect();
+        
+        // コントローラーの中心を記録
+        controllerCenter.x = rect.left + rect.width / 2;
+        controllerCenter.y = rect.top + rect.height / 2;
+        
+        // タッチ開始位置を記録
+        touchStartPos.x = touch.clientX;
+        touchStartPos.y = touch.clientY;
+        
+        isTouchingFlick = true;
+        
+        // インジケーターを中央に配置
+        flickIndicator.style.left = '50%';
+        flickIndicator.style.top = '50%';
+        flickIndicator.style.transform = 'translate(-50%, -50%)';
+        flickIndicator.classList.add('active');
     });
-    leftBtn.addEventListener('touchend', (e) => {
+    
+    flickController.addEventListener('touchmove', (e) => {
+        e.preventDefault();
+        if (!isTouchingFlick) return;
+        
+        const touch = e.touches[0];
+        const deltaX = touch.clientX - touchStartPos.x;
+        const deltaY = touch.clientY - touchStartPos.y;
+        
+        // インジケーターの位置を更新（制限付き）
+        const maxDistance = 50;
+        const distance = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
+        
+        let indicatorX = deltaX;
+        let indicatorY = deltaY;
+        
+        if (distance > maxDistance) {
+            const angle = Math.atan2(deltaY, deltaX);
+            indicatorX = Math.cos(angle) * maxDistance;
+            indicatorY = Math.sin(angle) * maxDistance;
+        }
+        
+        flickIndicator.style.left = `calc(50% + ${indicatorX}px)`;
+        flickIndicator.style.top = `calc(50% + ${indicatorY}px)`;
+        flickIndicator.style.transform = 'translate(-50%, -50%)';
+        
+        // 移動方向を決定（閾値を設定）
+        const threshold = 15;
+        if (Math.abs(deltaX) > threshold) {
+            if (deltaX < 0) {
+                player.moveLeft = true;
+                player.moveRight = false;
+            } else {
+                player.moveRight = true;
+                player.moveLeft = false;
+            }
+        } else {
+            player.moveLeft = false;
+            player.moveRight = false;
+        }
+    });
+    
+    flickController.addEventListener('touchend', (e) => {
         e.preventDefault();
         player.moveLeft = false;
+        player.moveRight = false;
+        isTouchingFlick = false;
+        flickIndicator.classList.remove('active');
     });
     
-    // 右ボタン
-    rightBtn.addEventListener('touchstart', (e) => {
+    flickController.addEventListener('touchcancel', (e) => {
         e.preventDefault();
-        player.moveRight = true;
-    });
-    rightBtn.addEventListener('touchend', (e) => {
-        e.preventDefault();
+        player.moveLeft = false;
         player.moveRight = false;
+        isTouchingFlick = false;
+        flickIndicator.classList.remove('active');
     });
+}
+
+// 仮想ボタンのイベントリスナー
+function setupVirtualButtons() {
+    const fireBtn = document.getElementById('fireBtn');
+    const startBtn = document.getElementById('startBtn');
     
     // 発射ボタン
     fireBtn.addEventListener('touchstart', (e) => {
@@ -948,6 +1015,7 @@ function fireBullet() {
 
 // ゲーム開始
 init();
+setupFlickController();
 setupVirtualButtons();
 gameLoop();
 
