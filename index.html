@@ -5,54 +5,60 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <meta name="apple-mobile-web-app-title" content="インベーダー">
+    <meta name="apple-mobile-web-app-title" content="ゲームコレクション">
     <meta name="mobile-web-app-capable" content="yes">
-    <meta name="theme-color" content="#000428">
-    <title>スペースインベーダー</title>
+    <meta name="theme-color" content="#667eea">
+    <title>ゲームコレクション</title>
     <link rel="stylesheet" href="style.css">
     <link rel="manifest" href="manifest.json">
 </head>
 <body>
-    <div class="game-container">
-        <div class="header">
-            <h1>スペースインベーダー</h1>
-            <div class="info">
-                <div class="score">スコア: <span id="score">0</span></div>
-                <div class="lives">残機: <span id="lives">3</span></div>
-            </div>
-        </div>
-        <canvas id="gameCanvas"></canvas>
-        
-        <!-- 仮想コントローラー -->
-        <div class="virtual-controls">
-            <div class="controls-row">
-                <div class="move-buttons">
-                    <button id="leftBtn" class="control-btn move-btn">◄</button>
-                    <button id="rightBtn" class="control-btn move-btn">►</button>
+    <div class="landing-container">
+        <header class="landing-header">
+            <h1 class="main-title">🎮 ゲームコレクション</h1>
+            <p class="subtitle">楽しいゲームがいっぱい！</p>
+        </header>
+
+        <main class="games-grid">
+            <!-- スペースインベーダー -->
+            <a href="./invader-game/index.html" class="game-card invader-card">
+                <div class="game-icon">👾</div>
+                <h2 class="game-title">スペースインベーダー</h2>
+                <p class="game-description">宇宙から迫りくる敵を撃ち落とせ！</p>
+                <div class="game-tags">
+                    <span class="tag">アクション</span>
+                    <span class="tag">シューティング</span>
                 </div>
-                <button id="fireBtn" class="control-btn fire-btn">🚀 発射</button>
-            </div>
-            <button id="startBtn" class="control-btn start-btn">▶ スタート</button>
-        </div>
-        
-        <div class="controls">
-            <p class="desktop-controls">PC: ← → 移動 | スペース: 発射 | Enter: 開始</p>
-            <p class="mobile-controls">📱 画面タップまたはボタンで操作</p>
-        </div>
-        <div id="gameOver" class="game-over hidden">
-            <h2>ゲームオーバー</h2>
-            <p>最終スコア: <span id="finalScore">0</span></p>
-            <p class="desktop-controls">Enterキーでリスタート</p>
-            <p class="mobile-controls">スタートボタンでリスタート</p>
-        </div>
-        <div id="gameWin" class="game-win hidden">
-            <h2>ステージクリア！</h2>
-            <p>スコア: <span id="winScore">0</span></p>
-            <p class="desktop-controls">Enterキーで次のステージ</p>
-            <p class="mobile-controls">スタートボタンで次のステージ</p>
-        </div>
+            </a>
+
+            <!-- スライディングパズル -->
+            <a href="./puzzle-game/index.html" class="game-card puzzle-card">
+                <div class="game-icon">🧩</div>
+                <h2 class="game-title">スライディングパズル</h2>
+                <p class="game-description">5x5のパズルを完成させよう！</p>
+                <div class="game-tags">
+                    <span class="tag">パズル</span>
+                    <span class="tag">脳トレ</span>
+                </div>
+            </a>
+
+            <!-- 神経衰弱 -->
+            <a href="./memory-game/index.html" class="game-card memory-card">
+                <div class="game-icon">🎴</div>
+                <h2 class="game-title">神経衰弱</h2>
+                <p class="game-description">同じカードを見つけよう！</p>
+                <div class="game-tags">
+                    <span class="tag">記憶</span>
+                    <span class="tag">カード</span>
+                </div>
+            </a>
+        </main>
+
+        <footer class="landing-footer">
+            <p>© 2024 ゲームコレクション - お楽しみください！</p>
+        </footer>
     </div>
-    <script src="game.js"></script>
+
     <script>
         // Service Worker登録
         if ('serviceWorker' in navigator) {
