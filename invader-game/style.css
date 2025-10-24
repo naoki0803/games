@@ -255,19 +255,22 @@ h1 {
 @media (max-width: 768px) {
     body {
         align-items: flex-start;
-        padding-top: max(10px, env(safe-area-inset-top));
-        padding-bottom: max(10px, env(safe-area-inset-bottom));
+        padding-top: max(5px, env(safe-area-inset-top));
+        padding-bottom: max(5px, env(safe-area-inset-bottom));
         justify-content: flex-start;
         overflow-y: auto;
+        /* iPhone ホーム画面起動時の高さ調整 */
+        min-height: 100vh;
+        min-height: -webkit-fill-available;
     }
     
     h1 {
         font-size: 1.5em;
-        margin-bottom: 10px;
+        margin-bottom: 8px;
     }
     
     .header {
-        margin-bottom: 10px;
+        margin-bottom: 8px;
     }
     
     .info {

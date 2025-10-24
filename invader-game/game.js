@@ -7,8 +7,14 @@ function setCanvasSize() {
     const isMobile = window.innerWidth <= 768;
     if (isMobile) {
         // モバイル: 縦画面に最適化（見切れ防止のため高さを調整）
+        // iPhone15のホーム画面起動に対応した高さ計算
+        // visualViewportまたはwindow.innerHeightを使用
+        const viewportHeight = window.visualViewport ? window.visualViewport.height : window.innerHeight;
+        
         canvas.width = Math.min(window.innerWidth - 20, 400);
-        canvas.height = Math.min(window.innerHeight - 180, 600);
+        // ヘッダー（約80px）、コントロール（約180px）、余白（約30px）を考慮
+        // より余裕を持たせて見切れを防ぐ
+        canvas.height = Math.max(Math.min(viewportHeight - 300, 600), 350);
     } else {
         // PC: 従来のサイズ
         canvas.width = 800;
@@ -517,10 +523,14 @@ function checkCollisions() {
             // 弾丸のサイズを判定
             let currentBulletWidth = bulletWidth;
             let currentBulletHeight = bulletHeight;
+            let bulletX = bullet.x - (currentBulletWidth - bulletWidth) / 2;
+            let bulletY = bullet.y;
             
             if (bullet.type === 'laser') {
                 currentBulletWidth = bulletWidth * 2;
+                // レーザーは画面上端（y=0）から発射位置まで
                 currentBulletHeight = bullet.y;
+                bulletY = 0; // レーザーは上端から始まる
             } else if (bullet.type === 'bomb') {
                 currentBulletWidth = bulletWidth * 3;
                 currentBulletHeight = bulletHeight * 2;
@@ -532,13 +542,13 @@ function checkCollisions() {
                 currentBulletHeight = bulletHeight * 1.5;
             }
             
-            const bulletX = bullet.x - (currentBulletWidth - bulletWidth) / 2;
+            bulletX = bullet.x - (currentBulletWidth - bulletWidth) / 2;
             
             if (invader.alive &&
                 bulletX < invader.x + invader.width &&
                 bulletX + currentBulletWidth > invader.x &&
-                bullet.y < invader.y + invader.height &&
-                bullet.y + currentBulletHeight > invader.y) {
+                bulletY < invader.y + invader.height &&
+                bulletY + currentBulletHeight > invader.y) {
                 
                 invader.alive = false;
                 hitCount++;
