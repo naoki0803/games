@@ -14,7 +14,9 @@ html {
 
 body {
     font-family: 'Arial', sans-serif;
-    background: linear-gradient(to bottom, #000428, #004e92);
+    background: radial-gradient(ellipse at top, #1a0033, #000000 50%),
+                linear-gradient(to bottom, #000428, #001a3d);
+    background-blend-mode: screen;
     display: flex;
     justify-content: center;
     align-items: center;
@@ -38,10 +40,13 @@ body {
 }
 
 .game-container {
-    background: rgba(0, 0, 0, 0.7);
+    background: linear-gradient(135deg, rgba(0, 20, 40, 0.9), rgba(0, 0, 20, 0.95));
     border-radius: 20px;
     padding: 20px;
-    box-shadow: 0 0 30px rgba(0, 255, 255, 0.5);
+    box-shadow: 0 0 40px rgba(0, 255, 255, 0.4),
+                0 0 80px rgba(0, 255, 0, 0.2),
+                inset 0 0 30px rgba(0, 100, 200, 0.1);
+    border: 2px solid rgba(0, 255, 255, 0.3);
 }
 
 .header {
@@ -52,8 +57,26 @@ body {
 h1 {
     font-size: 2.5em;
     color: #00ff00;
-    text-shadow: 0 0 10px #00ff00;
+    text-shadow: 0 0 10px #00ff00,
+                 0 0 20px #00ff00,
+                 0 0 30px #00ff00,
+                 0 0 40px rgba(0, 255, 0, 0.5);
     margin-bottom: 15px;
+    animation: glow 2s ease-in-out infinite alternate;
+}
+
+@keyframes glow {
+    from {
+        text-shadow: 0 0 10px #00ff00,
+                     0 0 20px #00ff00,
+                     0 0 30px #00ff00;
+    }
+    to {
+        text-shadow: 0 0 15px #00ff00,
+                     0 0 30px #00ff00,
+                     0 0 45px #00ff00,
+                     0 0 60px rgba(0, 255, 0, 0.5);
+    }
 }
 
 .info {
@@ -64,17 +87,28 @@ h1 {
 }
 
 .score, .lives {
-    background: rgba(0, 255, 0, 0.2);
+    background: linear-gradient(135deg, rgba(0, 255, 0, 0.2), rgba(0, 200, 0, 0.3));
     padding: 10px 20px;
     border-radius: 10px;
     border: 2px solid #00ff00;
+    box-shadow: 0 0 15px rgba(0, 255, 0, 0.3),
+                inset 0 0 10px rgba(0, 255, 0, 0.1);
+    transition: all 0.3s ease;
+}
+
+.score:hover, .lives:hover {
+    box-shadow: 0 0 25px rgba(0, 255, 0, 0.5),
+                inset 0 0 15px rgba(0, 255, 0, 0.2);
 }
 
 #gameCanvas {
     display: block;
-    background: #000;
+    background: radial-gradient(ellipse at center, #000811, #000000);
     border: 3px solid #00ff00;
-    box-shadow: 0 0 20px rgba(0, 255, 0, 0.5);
+    box-shadow: 0 0 20px rgba(0, 255, 0, 0.5),
+                0 0 40px rgba(0, 255, 255, 0.3),
+                inset 0 0 50px rgba(0, 50, 100, 0.3);
+    border-radius: 5px;
 }
 
 .controls {
@@ -152,7 +186,7 @@ h1 {
     font-size: 1.5em;
     padding: 15px 30px;
     border: 3px solid #00ff00;
-    background: rgba(0, 255, 0, 0.2);
+    background: linear-gradient(135deg, rgba(0, 255, 0, 0.2), rgba(0, 200, 0, 0.3));
     color: #00ff00;
     border-radius: 15px;
     cursor: pointer;
@@ -162,12 +196,15 @@ h1 {
     touch-action: manipulation;
     transition: all 0.2s;
     font-weight: bold;
+    box-shadow: 0 0 15px rgba(0, 255, 0, 0.3),
+                inset 0 0 10px rgba(0, 255, 0, 0.1);
 }
 
 .control-btn:active {
-    background: rgba(0, 255, 0, 0.5);
+    background: linear-gradient(135deg, rgba(0, 255, 0, 0.5), rgba(0, 200, 0, 0.6));
     transform: scale(0.95);
-    box-shadow: 0 0 20px rgba(0, 255, 0, 0.8);
+    box-shadow: 0 0 30px rgba(0, 255, 0, 0.8),
+                inset 0 0 20px rgba(0, 255, 0, 0.3);
 }
 
 .move-btn {
@@ -177,28 +214,34 @@ h1 {
 }
 
 .fire-btn {
-    background: rgba(255, 100, 0, 0.2);
+    background: linear-gradient(135deg, rgba(255, 100, 0, 0.2), rgba(255, 50, 0, 0.3));
     border-color: #ff6400;
     color: #ff6400;
     padding: 20px 50px;
     font-size: 1.8em;
+    box-shadow: 0 0 15px rgba(255, 100, 0, 0.3),
+                inset 0 0 10px rgba(255, 100, 0, 0.1);
 }
 
 .fire-btn:active {
-    background: rgba(255, 100, 0, 0.5);
-    box-shadow: 0 0 20px rgba(255, 100, 0, 0.8);
+    background: linear-gradient(135deg, rgba(255, 100, 0, 0.5), rgba(255, 50, 0, 0.6));
+    box-shadow: 0 0 30px rgba(255, 100, 0, 0.8),
+                inset 0 0 20px rgba(255, 100, 0, 0.3);
 }
 
 .start-btn {
-    background: rgba(0, 255, 255, 0.2);
+    background: linear-gradient(135deg, rgba(0, 255, 255, 0.2), rgba(0, 200, 255, 0.3));
     border-color: #00ffff;
     color: #00ffff;
     padding: 15px 40px;
+    box-shadow: 0 0 15px rgba(0, 255, 255, 0.3),
+                inset 0 0 10px rgba(0, 255, 255, 0.1);
 }
 
 .start-btn:active {
-    background: rgba(0, 255, 255, 0.5);
-    box-shadow: 0 0 20px rgba(0, 255, 255, 0.8);
+    background: linear-gradient(135deg, rgba(0, 255, 255, 0.5), rgba(0, 200, 255, 0.6));
+    box-shadow: 0 0 30px rgba(0, 255, 255, 0.8),
+                inset 0 0 20px rgba(0, 255, 255, 0.3);
 }
 
 .desktop-controls {
