@@ -34,8 +34,8 @@ const fireDelay = 300; // 連射制限（ミリ秒）
 const player = {
     x: 0,
     y: 0,
-    width: 50,
-    height: 30,
+    width: 40,
+    height: 24,
     speed: 5,
     moveLeft: false,
     moveRight: false
@@ -44,15 +44,15 @@ const player = {
 // 弾丸
 let bullets = [];
 const bulletSpeed = 7;
-const bulletWidth = 4;
-const bulletHeight = 15;
+const bulletWidth = 3;
+const bulletHeight = 12;
 
 // 敵
 let invaders = [];
 let invaderRows = 6;
 let invaderCols = 12;
-const invaderWidth = 36;
-const invaderHeight = 27;
+const invaderWidth = 28;
+const invaderHeight = 21;
 let invaderSpeed = 0.7;
 let invaderDirection = 1;
 let invaderDropDistance = 15;
@@ -61,6 +61,48 @@ let invaderDropDistance = 15;
 let enemyBullets = [];
 const enemyBulletSpeed = 3;
 
+// パーティクル（爆発エフェクト）
+let particles = [];
+
+// 星空背景
+let stars = [];
+
+// アニメーション用フレームカウンター
+let animationFrame = 0;
+
+// 星空を作成
+function createStars() {
+    stars = [];
+    const starCount = isMobile() ? 50 : 100;
+    for (let i = 0; i < starCount; i++) {
+        stars.push({
+            x: Math.random() * canvas.width,
+            y: Math.random() * canvas.height,
+            radius: Math.random() * 1.5 + 0.5,
+            alpha: Math.random() * 0.5 + 0.5,
+            twinkleSpeed: Math.random() * 0.02 + 0.01
+        });
+    }
+}
+
+// パーティクルを作成（爆発エフェクト）
+function createExplosion(x, y, color) {
+    const particleCount = isMobile() ? 8 : 15;
+    for (let i = 0; i < particleCount; i++) {
+        const angle = (Math.PI * 2 * i) / particleCount;
+        const speed = Math.random() * 3 + 2;
+        particles.push({
+            x: x,
+            y: y,
+            vx: Math.cos(angle) * speed,
+            vy: Math.sin(angle) * speed,
+            life: 1.0,
+            color: color,
+            size: Math.random() * 3 + 2
+        });
+    }
+}
+
 // 初期化
 function init() {
     gameState = 'ready';
@@ -68,6 +110,7 @@ function init() {
     lives = 3;
     bullets = [];
     enemyBullets = [];
+    particles = [];
     
     // プレイヤーの位置を初期化
     player.x = canvas.width / 2 - player.width / 2;
@@ -86,6 +129,7 @@ function init() {
     
     invaderSpeed = 0.7 + (level - 1) * 0.2;
     createInvaders();
+    createStars();
     updateDisplay();
 }
 
@@ -116,7 +160,20 @@ function createInvaders() {
 
 // プレイヤーを描画
 function drawPlayer() {
-    ctx.fillStyle = '#00ff00';
+    // 影
+    ctx.shadowBlur = 15;
+    ctx.shadowColor = '#00ff00';
+    
+    // グラデーション
+    const gradient = ctx.createLinearGradient(
+        player.x + player.width / 2, player.y,
+        player.x + player.width / 2, player.y + player.height
+    );
+    gradient.addColorStop(0, '#00ff00');
+    gradient.addColorStop(0.5, '#00dd00');
+    gradient.addColorStop(1, '#00aa00');
+    
+    ctx.fillStyle = gradient;
     // 宇宙船の形
     ctx.beginPath();
     ctx.moveTo(player.x + player.width / 2, player.y);
@@ -125,9 +182,33 @@ function drawPlayer() {
     ctx.closePath();
     ctx.fill();
     
+    // エンジン炎のアニメーション
+    if (gameState === 'playing' && Math.floor(animationFrame / 5) % 2 === 0) {
+        const flameGradient = ctx.createLinearGradient(
+            player.x + player.width / 2, player.y + player.height,
+            player.x + player.width / 2, player.y + player.height + 8
+        );
+        flameGradient.addColorStop(0, 'rgba(255, 200, 0, 0.9)');
+        flameGradient.addColorStop(0.5, 'rgba(255, 100, 0, 0.7)');
+        flameGradient.addColorStop(1, 'rgba(255, 0, 0, 0)');
+        
+        ctx.fillStyle = flameGradient;
+        ctx.beginPath();
+        ctx.moveTo(player.x + player.width / 2 - 5, player.y + player.height);
+        ctx.lineTo(player.x + player.width / 2, player.y + player.height + 8);
+        ctx.lineTo(player.x + player.width / 2 + 5, player.y + player.height);
+        ctx.closePath();
+        ctx.fill();
+    }
+    
     // コックピット
+    ctx.shadowBlur = 10;
+    ctx.shadowColor = '#00ffff';
     ctx.fillStyle = '#00ffff';
-    ctx.fillRect(player.x + player.width / 2 - 5, player.y + 10, 10, 10);
+    ctx.fillRect(player.x + player.width / 2 - 4, player.y + 8, 8, 8);
+    
+    // 影をリセット
+    ctx.shadowBlur = 0;
 }
 
 // インベーダーを描画
@@ -135,32 +216,115 @@ function drawInvaders() {
     invaders.forEach(invader => {
         if (invader.alive) {
             // 種類によって色を変える
-            const colors = ['#ff00ff', '#ff0000', '#ff8800', '#ffff00', '#ffffff'];
-            ctx.fillStyle = colors[invader.type];
+            const colors = [
+                { start: '#ff00ff', end: '#cc00cc' },
+                { start: '#ff0000', end: '#cc0000' },
+                { start: '#ff8800', end: '#cc6600' },
+                { start: '#ffff00', end: '#cccc00' },
+                { start: '#ffffff', end: '#cccccc' }
+            ];
+            const colorSet = colors[invader.type];
             
-            // シンプルなインベーダーの形
-            ctx.fillRect(invader.x + 5, invader.y, invader.width - 10, invader.height - 5);
-            ctx.fillRect(invader.x, invader.y + 10, invader.width, invader.height - 15);
+            // 影とグロー
+            ctx.shadowBlur = 10;
+            ctx.shadowColor = colorSet.start;
             
-            // 目
-            ctx.fillStyle = '#000';
-            ctx.fillRect(invader.x + 10, invader.y + 5, 5, 5);
-            ctx.fillRect(invader.x + invader.width - 15, invader.y + 5, 5, 5);
+            // グラデーション
+            const gradient = ctx.createLinearGradient(
+                invader.x, invader.y,
+                invader.x, invader.y + invader.height
+            );
+            gradient.addColorStop(0, colorSet.start);
+            gradient.addColorStop(1, colorSet.end);
+            ctx.fillStyle = gradient;
+            
+            // アニメーションでわずかに動く
+            const wobble = Math.sin(animationFrame * 0.1 + invader.x) * 1;
+            
+            // インベーダーの体
+            ctx.fillRect(invader.x + 4, invader.y + wobble, invader.width - 8, invader.height - 4);
+            ctx.fillRect(invader.x, invader.y + 8 + wobble, invader.width, invader.height - 12);
+            
+            // 触角
+            ctx.fillRect(invader.x + 2, invader.y - 2 + wobble, 3, 4);
+            ctx.fillRect(invader.x + invader.width - 5, invader.y - 2 + wobble, 3, 4);
+            
+            // 目（光る）
+            ctx.shadowBlur = 5;
+            ctx.shadowColor = '#fff';
+            ctx.fillStyle = Math.floor(animationFrame / 10) % 2 === 0 ? '#ffff00' : '#ff0000';
+            ctx.fillRect(invader.x + 7, invader.y + 4 + wobble, 4, 4);
+            ctx.fillRect(invader.x + invader.width - 11, invader.y + 4 + wobble, 4, 4);
+            
+            ctx.shadowBlur = 0;
         }
     });
 }
 
+// 星空を描画
+function drawStars() {
+    stars.forEach(star => {
+        ctx.fillStyle = `rgba(255, 255, 255, ${star.alpha})`;
+        ctx.beginPath();
+        ctx.arc(star.x, star.y, star.radius, 0, Math.PI * 2);
+        ctx.fill();
+        
+        // 星のきらめき
+        star.alpha += star.twinkleSpeed;
+        if (star.alpha > 1 || star.alpha < 0.3) {
+            star.twinkleSpeed *= -1;
+        }
+    });
+}
+
+// パーティクルを描画
+function drawParticles() {
+    particles.forEach(particle => {
+        ctx.fillStyle = `rgba(${particle.color}, ${particle.life})`;
+        ctx.shadowBlur = 5;
+        ctx.shadowColor = `rgba(${particle.color}, ${particle.life})`;
+        ctx.beginPath();
+        ctx.arc(particle.x, particle.y, particle.size, 0, Math.PI * 2);
+        ctx.fill();
+    });
+    ctx.shadowBlur = 0;
+}
+
 // 弾丸を描画
 function drawBullets() {
-    ctx.fillStyle = '#00ff00';
+    // プレイヤーの弾丸（グロー効果付き）
     bullets.forEach(bullet => {
+        const gradient = ctx.createLinearGradient(
+            bullet.x, bullet.y,
+            bullet.x, bullet.y + bulletHeight
+        );
+        gradient.addColorStop(0, '#00ff00');
+        gradient.addColorStop(0.5, '#00ff88');
+        gradient.addColorStop(1, '#00ffff');
+        
+        ctx.shadowBlur = 10;
+        ctx.shadowColor = '#00ff00';
+        ctx.fillStyle = gradient;
         ctx.fillRect(bullet.x, bullet.y, bulletWidth, bulletHeight);
     });
     
-    ctx.fillStyle = '#ff0000';
+    // 敵の弾丸（グロー効果付き）
     enemyBullets.forEach(bullet => {
+        const gradient = ctx.createLinearGradient(
+            bullet.x, bullet.y,
+            bullet.x, bullet.y + bulletHeight
+        );
+        gradient.addColorStop(0, '#ff0000');
+        gradient.addColorStop(0.5, '#ff8800');
+        gradient.addColorStop(1, '#ffff00');
+        
+        ctx.shadowBlur = 10;
+        ctx.shadowColor = '#ff0000';
+        ctx.fillStyle = gradient;
         ctx.fillRect(bullet.x, bullet.y, bulletWidth, bulletHeight);
     });
+    
+    ctx.shadowBlur = 0;
 }
 
 // プレイヤーを更新
@@ -171,6 +335,16 @@ function updatePlayer() {
     if (player.moveRight && player.x < canvas.width - player.width) {
         player.x += player.speed;
     }
+}
+
+// パーティクルを更新
+function updateParticles() {
+    particles = particles.filter(particle => {
+        particle.x += particle.vx;
+        particle.y += particle.vy;
+        particle.life -= 0.02;
+        return particle.life > 0;
+    });
 }
 
 // 弾丸を更新
@@ -244,6 +418,21 @@ function checkCollisions() {
                 invader.alive = false;
                 bullets.splice(bulletIndex, 1);
                 score += (5 - invader.type) * 10;
+                
+                // 爆発エフェクト
+                const colors = [
+                    '255, 0, 255',
+                    '255, 0, 0',
+                    '255, 136, 0',
+                    '255, 255, 0',
+                    '255, 255, 255'
+                ];
+                createExplosion(
+                    invader.x + invader.width / 2,
+                    invader.y + invader.height / 2,
+                    colors[invader.type]
+                );
+                
                 updateDisplay();
                 
                 // 全滅チェック
@@ -263,6 +452,14 @@ function checkCollisions() {
             
             enemyBullets.splice(bulletIndex, 1);
             lives--;
+            
+            // プレイヤーが被弾した時の爆発エフェクト
+            createExplosion(
+                player.x + player.width / 2,
+                player.y + player.height / 2,
+                '255, 0, 0'
+            );
+            
             updateDisplay();
             
             if (lives <= 0) {
@@ -296,23 +493,36 @@ function winLevel() {
 function gameLoop() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     
+    // アニメーションフレームを更新
+    animationFrame++;
+    
+    // 星空を描画
+    drawStars();
+    
     if (gameState === 'playing') {
         updatePlayer();
         updateBullets();
         updateInvaders();
+        updateParticles();
         checkCollisions();
+    } else {
+        updateParticles();
     }
     
     drawPlayer();
     drawInvaders();
     drawBullets();
+    drawParticles();
     
     // ゲーム状態テキスト
     if (gameState === 'ready') {
+        ctx.shadowBlur = 20;
+        ctx.shadowColor = '#00ff00';
         ctx.fillStyle = '#00ff00';
         ctx.font = '30px Arial';
         ctx.textAlign = 'center';
         ctx.fillText('Enterキーでスタート', canvas.width / 2, canvas.height / 2);
+        ctx.shadowBlur = 0;
     }
     
     requestAnimationFrame(gameLoop);
