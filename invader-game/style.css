@@ -256,7 +256,7 @@ h1 {
     body {
         align-items: flex-start;
         padding-top: max(10px, env(safe-area-inset-top));
-        padding-bottom: max(120px, env(safe-area-inset-bottom));
+        padding-bottom: max(10px, env(safe-area-inset-bottom));
         justify-content: flex-start;
         overflow-y: auto;
     }
@@ -302,8 +302,8 @@ h1 {
     .virtual-controls {
         display: flex;
         margin-top: 15px;
-        margin-bottom: 100px;
-        padding-bottom: max(20px, env(safe-area-inset-bottom));
+        margin-bottom: 20px;
+        padding-bottom: max(10px, env(safe-area-inset-bottom));
     }
     
     .controls-row {
