@@ -337,9 +337,17 @@ function drawBullets() {
         
         // パワーアップに応じて弾丸の見た目を変更
         if (bullet.type === 'laser') {
-            width = bulletWidth;
-            height = canvas.height; // 画面全体に届くレーザー
+            width = bulletWidth * 2;
+            height = bullet.y; // プレイヤー位置から上端まで
             color = '#ff00ff';
+            // レーザーの透明度を調整（点滅効果）
+            const alpha = bullet.life ? (bullet.life / 3) * 0.8 + 0.2 : 0.8;
+            ctx.fillStyle = `rgba(255, 0, 255, ${alpha})`;
+            ctx.fillRect(bullet.x - (width - bulletWidth) / 2, 0, width, height);
+            // レーザーの中心線（明るく）
+            ctx.fillStyle = `rgba(255, 100, 255, ${alpha})`;
+            ctx.fillRect(bullet.x, 0, bulletWidth, height);
+            return;
         } else if (bullet.type === 'bomb') {
             width = bulletWidth * 3;
             height = bulletHeight * 2;
@@ -355,7 +363,7 @@ function drawBullets() {
         }
         
         ctx.fillStyle = color;
-        ctx.fillRect(bullet.x - (width - bulletWidth) / 2, bullet.y - (bullet.type === 'laser' ? canvas.height - height : 0), width, height);
+        ctx.fillRect(bullet.x - (width - bulletWidth) / 2, bullet.y, width, height);
     });
     
     // 敵の弾丸
@@ -433,11 +441,18 @@ function updateParticles() {
 function updateBullets() {
     // プレイヤーの弾丸
     bullets = bullets.filter(bullet => {
-        bullet.y -= bulletSpeed;
-        if (bullet.vx) bullet.x += bullet.vx; // マルチショット用の横移動
+        // レーザーは移動しない、通常弾は上に移動
+        if (bullet.type !== 'laser') {
+            bullet.y -= bulletSpeed;
+            if (bullet.vx) bullet.x += bullet.vx; // マルチショット用の横移動
+        }
         
-        // レーザーは即座に消える
+        // レーザーの寿命管理
         if (bullet.type === 'laser') {
+            if (bullet.life !== undefined) {
+                bullet.life--;
+                return bullet.life > 0;
+            }
             return false;
         }
         
@@ -504,8 +519,8 @@ function checkCollisions() {
             let currentBulletHeight = bulletHeight;
             
             if (bullet.type === 'laser') {
-                currentBulletWidth = bulletWidth;
-                currentBulletHeight = canvas.height;
+                currentBulletWidth = bulletWidth * 2;
+                currentBulletHeight = bullet.y;
             } else if (bullet.type === 'bomb') {
                 currentBulletWidth = bulletWidth * 3;
                 currentBulletHeight = bulletHeight * 2;
@@ -910,11 +925,11 @@ function fireBullet() {
         
         if (playerPowerUps.multishot.active) {
             // マルチショット: 3方向に発射
-            bullets.push({ x: centerX, y: bulletY, vx: 0, type: bulletType });
-            bullets.push({ x: centerX - 10, y: bulletY, vx: -2, type: bulletType });
-            bullets.push({ x: centerX + 10, y: bulletY, vx: 2, type: bulletType });
+            bullets.push({ x: centerX, y: bulletY, vx: 0, type: bulletType, life: bulletType === 'laser' ? 3 : -1 });
+            bullets.push({ x: centerX - 10, y: bulletY, vx: -2, type: bulletType, life: bulletType === 'laser' ? 3 : -1 });
+            bullets.push({ x: centerX + 10, y: bulletY, vx: 2, type: bulletType, life: bulletType === 'laser' ? 3 : -1 });
         } else {
-            bullets.push({ x: centerX, y: bulletY, vx: 0, type: bulletType });
+            bullets.push({ x: centerX, y: bulletY, vx: 0, type: bulletType, life: bulletType === 'laser' ? 3 : -1 });
         }
         
         lastFireTime = currentTime;
