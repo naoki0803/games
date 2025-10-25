@@ -3,6 +3,18 @@
 
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
+const rotateOverlay = document.getElementById('rotateOverlay');
+
+function isLandscape() {
+  // iOS Safari では matchMedia が安定
+  return window.matchMedia && window.matchMedia('(orientation: landscape)').matches
+    || window.innerWidth > window.innerHeight;
+}
+
+function updateOrientationNotice() {
+  const show = !isLandscape();
+  if (rotateOverlay) rotateOverlay.style.display = show ? 'flex' : 'none';
+}
 
 // Layout / DPR
 function resizeCanvas() {
@@ -12,8 +24,10 @@ function resizeCanvas() {
   canvas.width = Math.floor(width * dpr);
   canvas.height = Math.floor(height * dpr);
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  updateOrientationNotice();
 }
 window.addEventListener('resize', resizeCanvas);
+window.addEventListener('orientationchange', () => { setTimeout(resizeCanvas, 50); });
 resizeCanvas();
 
 // UI elements
@@ -83,17 +97,33 @@ function circleOverlap(ax, ay, ar, bx, by, br) {
 }
 
 // Background stars
-const stars = new Array(120).fill(0).map(() => ({
-  x: rand() * window.innerWidth,
-  y: rand() * window.innerHeight,
-  z: 0.3 + rand() * 0.7,
-}));
+const stars = new Array(120).fill(0).map(() => ({ x: 0, y: 0, z: 0 }));
+
+function scatterStars() {
+  const dpr = window.devicePixelRatio || 1;
+  const w = (canvas.width || window.innerWidth) / dpr;
+  const h = (canvas.height || window.innerHeight) / dpr;
+  for (let i = 0; i < stars.length; i++) {
+    stars[i].x = rand() * w;
+    stars[i].y = rand() * h;
+    stars[i].z = 0.3 + rand() * 0.7;
+  }
+}
+// 初期配置
+scatterStars();
 
 function drawStars(dt) {
   ctx.save();
+  const dpr = window.devicePixelRatio || 1;
+  const w = canvas.width / dpr;
+  const h = canvas.height / dpr;
   for (const s of stars) {
     s.x -= (world.speed * 0.3 * s.z) * dt;
-    if (s.x < -2) { s.x = window.innerWidth + rand()*100; s.y = rand()*window.innerHeight; s.z = 0.3 + rand()*0.7; }
+    if (s.x < -2) {
+      s.x = w + rand()*100;
+      s.y = rand()*h;
+      s.z = 0.3 + rand()*0.7;
+    }
     const alpha = 0.5 * s.z;
     ctx.fillStyle = `rgba(150,200,255,${alpha})`;
     ctx.fillRect(s.x, s.y, 2*s.z, 2*s.z);
@@ -109,12 +139,14 @@ highScoreEl.textContent = highScore.toString();
 // Spawning
 let enemySpawnTimer = 0;
 function spawnEnemy() {
-  const h = canvas.height / (window.devicePixelRatio || 1);
+  const dpr = window.devicePixelRatio || 1;
+  const w = canvas.width / dpr;
+  const h = canvas.height / dpr;
   const y = 40 + rand() * (h - 80);
   const type = rand() < 0.75 ? 'grunt' : 'shooter';
   const radius = type === 'grunt' ? 16 : 18;
   enemies.push({
-    x: window.innerWidth + 40,
+    x: w + 40,
     y,
     radius,
     hp: type === 'grunt' ? 1 : 3,
@@ -214,6 +246,7 @@ function resetGame() {
 }
 
 function startGame() {
+  if (!isLandscape()) { updateOrientationNotice(); return; }
   resetGame();
   gameState = State.Playing;
   lastTime = performance.now();

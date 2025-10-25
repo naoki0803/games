@@ -12,28 +12,40 @@
     <noscript>本ゲームを遊ぶには JavaScript を有効にしてください。</noscript>
 
     <div id="app">
-      <canvas id="gameCanvas" aria-label="横スクロールシューティング"></canvas>
-
-      <div id="hud" class="hud">
-        <div class="hud-left">
-          <div class="score">SCORE: <span id="scoreValue">0</span></div>
-          <div class="highscore">BEST: <span id="highScoreValue">0</span></div>
-        </div>
-        <div class="hud-right">
-          <div class="health">
-            HP
-            <div class="healthbar">
-              <div id="healthFill" class="healthbar-fill" style="width:100%"></div>
-            </div>
+      <!-- 上部ステータスバー -->
+      <div id="topBar" class="bar top-bar">
+        <div id="hud" class="hud">
+          <div class="hud-left">
+            <div class="score">SCORE: <span id="scoreValue">0</span></div>
+            <div class="highscore">BEST: <span id="highScoreValue">0</span></div>
           </div>
-          <button id="pauseBtn" class="btn" aria-label="一時停止">⏸</button>
+          <div class="hud-right">
+            <div class="health">
+              HP
+              <div class="healthbar">
+                <div id="healthFill" class="healthbar-fill" style="width:100%"></div>
+              </div>
+            </div>
+            <button id="pauseBtn" class="btn" aria-label="一時停止">⏸</button>
+          </div>
         </div>
+      </div>
+
+      <!-- ステージ領域（キャンバス） -->
+      <div id="stage" class="stage">
+        <canvas id="gameCanvas" aria-label="横スクロールシューティング"></canvas>
+      </div>
+
+      <!-- 下部ステータス/操作バー -->
+      <div id="bottomBar" class="bar bottom-bar">
+        <div class="bottom-spacer"></div>
+        <button id="fireBtn" class="btn fire-btn" aria-label="発射">🚀 発射</button>
       </div>
 
       <div id="overlay" class="overlay hidden">
         <div class="panel">
           <h1 class="title">Shmup Zero</h1>
-          <p class="subtitle">ドラッグで移動 / 右下の発射ボタン長押しで射撃（PC: 矢印/WASD + スペース）</p>
+          <p class="subtitle">横向きでプレイ推奨。ドラッグで移動 / 右下の発射ボタン長押しで射撃（PC: 矢印/WASD + スペース）</p>
           <div class="controls">
             <button id="startBtn" class="btn primary">ゲーム開始</button>
             <button id="restartBtn" class="btn hidden">もう一度</button>
@@ -41,10 +53,15 @@
           <div id="finalStats" class="final-stats hidden"></div>
         </div>
       </div>
-    </div>
 
-    <!-- Mobile fire button -->
-    <button id="fireBtn" class="btn fire-btn" aria-label="発射">🚀 発射</button>
+      <!-- 縦向き時の回転促しオーバーレイ -->
+      <div id="rotateOverlay" class="rotate-overlay">
+        <div class="panel">
+          <h2 class="title">横向きでプレイしてください</h2>
+          <p class="subtitle">iPhone を横向きにするとゲームを開始できます。</p>
+        </div>
+      </div>
+    </div>
 
     <script type="module" src="./game.js"></script>
     <script>
