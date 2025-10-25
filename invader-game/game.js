@@ -22,15 +22,33 @@ function setCanvasSize() {
     if (!canvas) return;
     const isMobile = window.innerWidth <= 768;
     if (isMobile) {
-        // モバイル: 縦画面に最適化（見切れ防止のため高さを調整）
-        // iPhone15のホーム画面起動に対応した高さ計算
-        // visualViewportまたはwindow.innerHeightを使用
+        // モバイル: 実測UI高さからキャンバス高さを算出（見切れ防止）
         const viewportHeight = window.visualViewport ? window.visualViewport.height : window.innerHeight;
-        
+
+        // 実際のレイアウト要素の高さを測定
+        const headerEl = document.querySelector('.header');
+        const controlsRowEl = document.querySelector('.controls-row');
+        const headerHeight = headerEl ? headerEl.getBoundingClientRect().height : 0;
+        const controlsRowVisible = controlsRowEl && getComputedStyle(controlsRowEl).display !== 'none';
+        const controlsHeight = controlsRowVisible ? controlsRowEl.getBoundingClientRect().height : 0;
+
+        // セーフエリアや余白分の安全マージン
+        let safePadding = 32;
+        try {
+            const bodyStyles = getComputedStyle(document.body);
+            const pb = parseInt(bodyStyles.paddingBottom || '0', 10);
+            if (!Number.isNaN(pb)) safePadding = Math.max(safePadding, pb + 12);
+        } catch (_) {
+            // 取得できない環境では既定値を使用
+        }
+
+        // 横幅は従来通り
         canvas.width = Math.min(window.innerWidth - 20, 400);
-        // ヘッダー（約70px）、フリックコントローラー（約160px）、余白（約30px）を考慮
-        // さらに余裕を持たせて見切れを防ぐ
-        canvas.height = Math.max(Math.min(viewportHeight - 280, 600), 340);
+
+        // 利用可能高さから各UIの高さを引いて算出
+        const availableHeight = viewportHeight - headerHeight - controlsHeight - safePadding;
+        const targetHeight = Math.max(260, Math.min(availableHeight, 600));
+        canvas.height = Math.floor(targetHeight);
     } else {
         // PC: 従来のサイズ
         canvas.width = 800;
@@ -1086,6 +1104,11 @@ function startGame() {
     if (!window.invaderResizeListenerAdded) {
         window.addEventListener('resize', setCanvasSize);
         window.invaderResizeListenerAdded = true;
+    }
+    // visualViewportのサイズ変化にも追従
+    if (window.visualViewport && !window.invaderVVResizeListenerAdded) {
+        window.visualViewport.addEventListener('resize', setCanvasSize);
+        window.invaderVVResizeListenerAdded = true;
     }
     
     // ゲームを初期化
