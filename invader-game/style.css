@@ -337,15 +337,23 @@ h1 {
 }
 
 @media (max-width: 768px) {
+    html {
+        overflow: auto;
+        position: static;
+    }
+    
     body {
         align-items: flex-start;
         padding-top: max(5px, env(safe-area-inset-top));
         padding-bottom: max(5px, env(safe-area-inset-bottom));
         justify-content: flex-start;
         overflow-y: auto;
+        overflow-x: hidden;
         /* iPhone ホーム画面起動時の高さ調整 */
         min-height: 100vh;
         min-height: -webkit-fill-available;
+        position: static;
+        height: auto;
     }
     
     h1 {
@@ -374,9 +382,10 @@ h1 {
         border-radius: 0;
         background: rgba(0, 0, 0, 0.85);
         box-shadow: none;
-        min-height: 100vh;
+        min-height: auto;
         display: flex;
         flex-direction: column;
+        margin: 0;
     }
     
     #gameCanvas {
@@ -390,7 +399,7 @@ h1 {
         display: flex;
         margin-top: 15px;
         margin-bottom: 20px;
-        padding-bottom: max(10px, env(safe-area-inset-bottom));
+        padding-bottom: max(20px, env(safe-area-inset-bottom));
     }
     
     .controls-row {
