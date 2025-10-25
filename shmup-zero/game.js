@@ -25,6 +25,7 @@ const scoreEl = document.getElementById('scoreValue');
 const highScoreEl = document.getElementById('highScoreValue');
 const healthFillEl = document.getElementById('healthFill');
 const finalStatsEl = document.getElementById('finalStats');
+const fireBtn = document.getElementById('fireBtn');
 
 // Game state
 const State = {
@@ -150,28 +151,46 @@ window.addEventListener('keyup', (e) => {
   if (e.code === 'Space') input.shoot = false;
 });
 
-// Controls - pointer / touch drag
+// Controls - pointer / touch drag (relative, no teleport)
 canvas.addEventListener('pointerdown', (e) => {
-  input.pointerId = e.pointerId;
-  input.dragging = true;
-  input.shoot = true; // auto-fire while dragging
-});
-window.addEventListener('pointermove', (e) => {
-  if (!input.dragging || e.pointerId !== input.pointerId) return;
+  e.preventDefault();
   const rect = canvas.getBoundingClientRect();
   const px = (e.clientX - rect.left);
   const py = (e.clientY - rect.top);
-  player.x = clamp(px, 20, rect.width - 20);
-  player.y = clamp(py, 20, rect.height - 20);
+  input.pointerId = e.pointerId;
+  input.dragging = true;
+  // 記録: ポインタ位置とプレイヤー位置の差分
+  input.dragOffsetX = player.x - px;
+  input.dragOffsetY = player.y - py;
+});
+window.addEventListener('pointermove', (e) => {
+  if (!input.dragging || e.pointerId !== input.pointerId) return;
+  e.preventDefault();
+  const rect = canvas.getBoundingClientRect();
+  const px = (e.clientX - rect.left);
+  const py = (e.clientY - rect.top);
+  const targetX = px + (input.dragOffsetX || 0);
+  const targetY = py + (input.dragOffsetY || 0);
+  player.x = clamp(targetX, 20, rect.width - 20);
+  player.y = clamp(targetY, 20, rect.height - 20);
 });
 window.addEventListener('pointerup', (e) => {
   if (e.pointerId !== input.pointerId) return;
-  input.dragging = false; input.pointerId = null; input.shoot = false;
+  e.preventDefault();
+  input.dragging = false; input.pointerId = null;
 });
 
 startBtn.addEventListener('click', () => startGame());
 restartBtn.addEventListener('click', () => startGame());
 pauseBtn.addEventListener('click', () => togglePause());
+if (fireBtn) {
+  const startShooting = (e) => { e.preventDefault(); input.shoot = true; };
+  const stopShooting = (e) => { e.preventDefault(); input.shoot = false; };
+  fireBtn.addEventListener('touchstart', startShooting, { passive: false });
+  fireBtn.addEventListener('touchend', stopShooting, { passive: false });
+  fireBtn.addEventListener('mousedown', startShooting);
+  window.addEventListener('mouseup', stopShooting);
+}
 
 function togglePause() {
   if (gameState === State.Playing) {
@@ -275,7 +294,7 @@ function loop(now) {
 
   // Shooting
   player.fireCooldown -= dt;
-  if ((input.shoot || mvx !== 0 || mvy !== 0) && player.fireCooldown <= 0) {
+  if (input.shoot && player.fireCooldown <= 0) {
     player.fireCooldown = player.fireRate;
     bullets.push({ x: player.x + 14, y: player.y, vx: 520, vy: 0, radius: 4, from: 'player' });
     // side shots at higher difficulty
