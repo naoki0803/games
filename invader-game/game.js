@@ -1031,19 +1031,10 @@ function fireBullet() {
     }
 }
 
-// ゲーム開始
-init();
-setupFlickController();
-setupVirtualButtons();
-gameLoop();
-
-// 自動的にゲームを開始
-setTimeout(() => {
-    if (gameState === 'ready') {
-        gameState = 'playing';
-    }
-}, 100);
-or('Failed to initialize canvas');
+// ゲーム開始関数
+function startGame() {
+    if (!initCanvas()) {
+        console.error('Failed to initialize canvas');
         return;
     }
     
