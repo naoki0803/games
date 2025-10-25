@@ -1,0 +1,13 @@
+{
+  "name": "横スクロール シューティング",
+  "short_name": "サイドスクローラー",
+  "description": "グラディウス風 横スクロール・シューティング",
+  "start_url": "./index.html",
+  "display": "fullscreen",
+  "orientation": "landscape",
+  "background_color": "#0a0a1a",
+  "theme_color": "#0a0a1a",
+  "icons": [],
+  "categories": ["games", "action"],
+  "lang": "ja"
+}
