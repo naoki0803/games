@@ -280,6 +280,20 @@ h1 {
     font-size: 2em;
 }
 
+/* トグルボタンのラッパー */
+.toggle-btn-wrapper {
+    position: relative;
+    width: auto;
+    height: auto;
+    display: inline-block;
+}
+
+.toggle-btn-wrapper .control-btn {
+    position: absolute;
+    top: 0;
+    left: 0;
+}
+
 .fire-btn {
     background: linear-gradient(135deg, rgba(255, 100, 0, 0.2), rgba(255, 50, 0, 0.3));
     border-color: #ff6400;
@@ -288,6 +302,7 @@ h1 {
     font-size: 1.8em;
     box-shadow: 0 0 15px rgba(255, 100, 0, 0.3),
                 inset 0 0 10px rgba(255, 100, 0, 0.1);
+    position: relative;
 }
 
 .fire-btn:active {
@@ -300,7 +315,8 @@ h1 {
     background: linear-gradient(135deg, rgba(0, 255, 255, 0.2), rgba(0, 200, 255, 0.3));
     border-color: #00ffff;
     color: #00ffff;
-    padding: 15px 40px;
+    padding: 20px 50px;
+    font-size: 1.8em;
     box-shadow: 0 0 15px rgba(0, 255, 255, 0.3),
                 inset 0 0 10px rgba(0, 255, 255, 0.1);
     display: none; /* 初期状態は非表示 */
@@ -413,8 +429,8 @@ h1 {
     }
     
     .start-btn {
-        padding: 12px 35px;
-        font-size: 1.2em;
+        padding: 15px 40px;
+        font-size: 1.5em;
     }
     
     .desktop-controls {
@@ -503,7 +519,7 @@ h1 {
     }
     
     .start-btn {
-        padding: 8px 25px;
-        font-size: 1em;
+        padding: 10px 30px;
+        font-size: 1.2em;
     }
 }
