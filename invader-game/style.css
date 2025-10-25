@@ -351,9 +351,8 @@ h1 {
         justify-content: flex-start;
         overflow-y: auto;
         overflow-x: hidden;
-        /* iPhone ホーム画面起動時の高さ調整 */
-        min-height: 100vh;
-        min-height: -webkit-fill-available;
+        /* 動的ビューポート高さに追従 */
+        min-height: 100dvh;
         position: static;
         height: auto;
     }
@@ -404,6 +403,8 @@ h1 {
         padding-bottom: max(20px, env(safe-area-inset-bottom));
         padding-left: 10px;
         padding-right: 10px;
+        position: sticky;
+        bottom: 0;
     }
     
     .controls-row {
