@@ -30,9 +30,13 @@ function initDrawMode() {
     eraserBtn.style.color = '';
 }
 
-// ページロード時にイベントリスナーを一度だけ登録
-window.addEventListener('load', () => {
+// ページロード完了時またはDOMContentLoaded時にイベントリスナーを登録
+function setupDrawListeners() {
     const canvas = document.getElementById('drawCanvas');
+    if (!canvas) {
+        console.error('drawCanvas not found');
+        return;
+    }
     const ctx = canvas.getContext('2d');
     
     // ペンサイズスライダー
@@ -102,7 +106,14 @@ window.addEventListener('load', () => {
         console.log('手描きデータを保存:', gameState.imageData.substring(0, 50) + '...');
         showPreview();
     });
-});
+}
+
+// ページロード時に実行
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', setupDrawListeners);
+} else {
+    setupDrawListeners();
+}
 
 function startDrawing(e) {
     drawState.isDrawing = true;
@@ -183,9 +194,12 @@ function drawLine(x1, y1, x2, y2) {
     drawState.ctx.stroke();
 }
 
-// キャンバスのリサイズ対応
-window.addEventListener('resize', () => {
-    if (drawState.canvas && gameState.currentScreen === 'draw') {
-        // リサイズ時の処理（必要に応じて）
-    }
-});
+// キャンバスのリサイズ対応（既に登録されている場合は重複しないように）
+if (!window.drawResizeListenerAdded) {
+    window.addEventListener('resize', () => {
+        if (drawState.canvas && gameState.currentScreen === 'draw') {
+            // リサイズ時の処理（必要に応じて）
+        }
+    });
+    window.drawResizeListenerAdded = true;
+}

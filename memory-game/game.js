@@ -39,8 +39,13 @@ const backToMenuBtn = document.getElementById('backToMenuBtn');
 const playAgainBtn = document.getElementById('playAgainBtn');
 const changeDifficultyBtn = document.getElementById('changeDifficultyBtn');
 
-// 初期化
+// 初期化（イベントリスナーの重複登録を防ぐ）
+let isInitialized = false;
+
 function init() {
+    if (isInitialized) return;
+    isInitialized = true;
+    
     // 難易度選択
     difficultyButtons.forEach(btn => {
         btn.addEventListener('click', () => {
