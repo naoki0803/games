@@ -709,6 +709,7 @@ function gameOver() {
     gameState = 'gameOver';
     document.getElementById('finalScore').textContent = score;
     document.getElementById('gameOver').classList.remove('hidden');
+    updateButtonVisibility();
 }
 
 // ステージクリア
@@ -716,6 +717,7 @@ function winLevel() {
     gameState = 'win';
     document.getElementById('winScore').textContent = score;
     document.getElementById('gameWin').classList.remove('hidden');
+    updateButtonVisibility();
 }
 
 // ゲームループ
@@ -805,16 +807,19 @@ document.addEventListener('keydown', (e) => {
     if (e.key === 'Enter') {
         if (gameState === 'ready') {
             gameState = 'playing';
+            updateButtonVisibility();
         } else if (gameState === 'gameOver') {
             document.getElementById('gameOver').classList.add('hidden');
             level = 1;
             init();
             gameState = 'playing';
+            updateButtonVisibility();
         } else if (gameState === 'win') {
             document.getElementById('gameWin').classList.add('hidden');
             level++;
             init();
             gameState = 'playing';
+            updateButtonVisibility();
         }
     }
 });
@@ -975,6 +980,26 @@ function setupFlickController() {
     });
 }
 
+// ボタンの表示を更新
+function updateButtonVisibility() {
+    const fireBtn = document.getElementById('fireBtn');
+    const startBtn = document.getElementById('startBtn');
+    
+    if (gameState === 'playing') {
+        // プレイ中は発射ボタンのみ表示
+        fireBtn.style.display = 'block';
+        startBtn.style.display = 'none';
+    } else if (gameState === 'gameOver' || gameState === 'win') {
+        // ゲームオーバー/クリア時はスタートボタンのみ表示
+        fireBtn.style.display = 'none';
+        startBtn.style.display = 'block';
+    } else if (gameState === 'ready') {
+        // 準備中は発射ボタンのみ表示（スタートは非表示）
+        fireBtn.style.display = 'block';
+        startBtn.style.display = 'none';
+    }
+}
+
 // 仮想ボタンのイベントリスナー
 function setupVirtualButtons() {
     const fireBtn = document.getElementById('fireBtn');
@@ -993,18 +1018,24 @@ function setupVirtualButtons() {
         e.preventDefault();
         if (gameState === 'ready') {
             gameState = 'playing';
+            updateButtonVisibility();
         } else if (gameState === 'gameOver') {
             document.getElementById('gameOver').classList.add('hidden');
             level = 1;
             init();
             gameState = 'playing';
+            updateButtonVisibility();
         } else if (gameState === 'win') {
             document.getElementById('gameWin').classList.add('hidden');
             level++;
             init();
             gameState = 'playing';
+            updateButtonVisibility();
         }
     });
+    
+    // 初期表示を設定
+    updateButtonVisibility();
 }
 
 // 弾丸発射関数
@@ -1068,6 +1099,7 @@ function startGame() {
     setTimeout(() => {
         if (gameState === 'ready') {
             gameState = 'playing';
+            updateButtonVisibility();
         }
     }, 100);
 }
