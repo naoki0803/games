@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="サイドスクローラー">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="theme-color" content="#0a0a1a">
+  <title>横スクロール シューティング</title>
+  <link rel="stylesheet" href="style.css">
+  <link rel="manifest" href="manifest.json">
+</head>
+<body>
+  <div class="game-container">
+    <header class="header">
+      <h1>横スクロール シューティング</h1>
+      <div class="info">
+        <div class="score">スコア: <span id="score">0</span></div>
+        <div class="lives">残機: <span id="lives">3</span></div>
+      </div>
+    </header>
+
+    <canvas id="gameCanvas"></canvas>
+
+    <div class="virtual-controls">
+      <div class="controls-row">
+        <div class="move-buttons">
+          <button id="leftBtn" class="control-btn move-btn">◄</button>
+          <button id="rightBtn" class="control-btn move-btn">►</button>
+          <button id="upBtn" class="control-btn move-btn">▲</button>
+          <button id="downBtn" class="control-btn move-btn">▼</button>
+        </div>
+        <div class="toggle-btn-wrapper">
+          <button id="fireBtn" class="control-btn fire-btn">🚀 発射</button>
+          <button id="startBtn" class="control-btn start-btn">▶ スタート</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="controls">
+      <p class="desktop-controls">PC: WASD/矢印で移動 | J/スペース: 発射 | Enter: 開始</p>
+      <p class="mobile-controls">📱 ボタンで移動・発射</p>
+    </div>
+
+    <div id="gameOver" class="game-over hidden">
+      <h2>ゲームオーバー</h2>
+      <p>最終スコア: <span id="finalScore">0</span></p>
+      <p class="desktop-controls">Enterキーでリスタート</p>
+      <p class="mobile-controls">スタートボタンでリスタート</p>
+    </div>
+
+    <div id="gameWin" class="game-win hidden">
+      <h2>ステージクリア！</h2>
+      <p>スコア: <span id="winScore">0</span></p>
+      <p class="desktop-controls">Enterキーで次のステージ</p>
+      <p class="mobile-controls">スタートボタンで次のステージ</p>
+    </div>
+  </div>
+
+  <script src="game.js"></script>
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('./service-worker.js')
+          .then(reg => console.log('SW 登録成功', reg))
+          .catch(err => console.log('SW 登録失敗', err));
+      });
+    }
+  </script>
+</body>
+</html>
