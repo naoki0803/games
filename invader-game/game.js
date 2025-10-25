@@ -28,9 +28,9 @@ function setCanvasSize() {
         const viewportHeight = window.visualViewport ? window.visualViewport.height : window.innerHeight;
         
         canvas.width = Math.min(window.innerWidth - 20, 400);
-        // ヘッダー（約70px）、フリックコントローラー（約160px）、余白（約20px）を考慮
-        // より余裕を持たせて見切れを防ぐ
-        canvas.height = Math.max(Math.min(viewportHeight - 260, 600), 350);
+        // ヘッダー（約70px）、フリックコントローラー（約160px）、余白（約30px）を考慮
+        // さらに余裕を持たせて見切れを防ぐ
+        canvas.height = Math.max(Math.min(viewportHeight - 280, 600), 340);
     } else {
         // PC: 従来のサイズ
         canvas.width = 800;
@@ -175,11 +175,11 @@ function init() {
     if (isMobile()) {
         invaderRows = 5;
         invaderCols = 8;
-        player.speed = 6; // 移動を少し速く
+        player.speed = 4; // 移動を少し遅く（6から4へ変更）
     } else {
         invaderRows = 6;
         invaderCols = 12;
-        player.speed = 5;
+        player.speed = 3.5; // 移動を少し遅く（5から3.5へ変更）
     }
     
     // ベース速度を記録
