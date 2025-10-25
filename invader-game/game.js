@@ -833,54 +833,58 @@ let touchStartX = 0;
 let touchStartY = 0;
 let isTouching = false;
 
-// キャンバスタッチイベント（移動用）
-canvas.addEventListener('touchstart', (e) => {
-    e.preventDefault();
-    const touch = e.touches[0];
-    const rect = canvas.getBoundingClientRect();
-    const touchX = touch.clientX - rect.left;
-    const touchY = touch.clientY - rect.top;
+// キャンバスタッチイベントのセットアップ（移動用）
+function setupCanvasTouchEvents() {
+    if (!canvas) return;
     
-    touchStartX = touchX;
-    touchStartY = touchY;
-    isTouching = true;
-    
-    // タッチ位置に応じて移動方向を決定
-    const canvasCenter = canvas.width / 2;
-    if (touchX < canvasCenter) {
-        player.moveLeft = true;
-        player.moveRight = false;
-    } else {
-        player.moveRight = true;
-        player.moveLeft = false;
-    }
-});
+    canvas.addEventListener('touchstart', (e) => {
+        e.preventDefault();
+        const touch = e.touches[0];
+        const rect = canvas.getBoundingClientRect();
+        const touchX = touch.clientX - rect.left;
+        const touchY = touch.clientY - rect.top;
+        
+        touchStartX = touchX;
+        touchStartY = touchY;
+        isTouching = true;
+        
+        // タッチ位置に応じて移動方向を決定
+        const canvasCenter = canvas.width / 2;
+        if (touchX < canvasCenter) {
+            player.moveLeft = true;
+            player.moveRight = false;
+        } else {
+            player.moveRight = true;
+            player.moveLeft = false;
+        }
+    });
 
-canvas.addEventListener('touchmove', (e) => {
-    e.preventDefault();
-    if (!isTouching) return;
-    
-    const touch = e.touches[0];
-    const rect = canvas.getBoundingClientRect();
-    const touchX = touch.clientX - rect.left;
-    
-    // タッチ位置に応じて移動方向を更新
-    const canvasCenter = canvas.width / 2;
-    if (touchX < canvasCenter) {
-        player.moveLeft = true;
-        player.moveRight = false;
-    } else {
-        player.moveRight = true;
-        player.moveLeft = false;
-    }
-});
+    canvas.addEventListener('touchmove', (e) => {
+        e.preventDefault();
+        if (!isTouching) return;
+        
+        const touch = e.touches[0];
+        const rect = canvas.getBoundingClientRect();
+        const touchX = touch.clientX - rect.left;
+        
+        // タッチ位置に応じて移動方向を更新
+        const canvasCenter = canvas.width / 2;
+        if (touchX < canvasCenter) {
+            player.moveLeft = true;
+            player.moveRight = false;
+        } else {
+            player.moveRight = true;
+            player.moveLeft = false;
+        }
+    });
 
-canvas.addEventListener('touchend', (e) => {
-    e.preventDefault();
-    player.moveLeft = false;
-    player.moveRight = false;
-    isTouching = false;
-});
+    canvas.addEventListener('touchend', (e) => {
+        e.preventDefault();
+        player.moveLeft = false;
+        player.moveRight = false;
+        isTouching = false;
+    });
+}
 
 // フリックコントローラーのセットアップ
 function setupFlickController() {
@@ -1055,6 +1059,7 @@ function startGame() {
     
     // ゲームを初期化
     init();
+    setupCanvasTouchEvents();
     setupFlickController();
     setupVirtualButtons();
     gameLoop();
