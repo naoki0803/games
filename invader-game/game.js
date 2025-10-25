@@ -1,9 +1,25 @@
 // ゲーム設定
-const canvas = document.getElementById('gameCanvas');
-const ctx = canvas.getContext('2d');
+let canvas;
+let ctx;
+
+// キャンバスの初期化
+function initCanvas() {
+    canvas = document.getElementById('gameCanvas');
+    if (!canvas) {
+        console.error('Canvas element not found!');
+        return false;
+    }
+    ctx = canvas.getContext('2d');
+    if (!ctx) {
+        console.error('Cannot get 2D context!');
+        return false;
+    }
+    return true;
+}
 
 // キャンバスサイズをデバイスに合わせて設定
 function setCanvasSize() {
+    if (!canvas) return;
     const isMobile = window.innerWidth <= 768;
     if (isMobile) {
         // モバイル: 縦画面に最適化（見切れ防止のため高さを調整）
@@ -21,9 +37,6 @@ function setCanvasSize() {
         canvas.height = 600;
     }
 }
-
-setCanvasSize();
-window.addEventListener('resize', setCanvasSize);
 
 // デバイス検出
 const isMobile = () => window.innerWidth <= 768;
@@ -104,6 +117,7 @@ let animationFrame = 0;
 
 // 星空を作成
 function createStars() {
+    if (!canvas) return;
     stars = [];
     const starCount = isMobile() ? 50 : 100;
     for (let i = 0; i < starCount; i++) {
@@ -137,6 +151,8 @@ function createExplosion(x, y, color) {
 
 // 初期化
 function init() {
+    if (!canvas) return;
+    
     gameState = 'ready';
     score = 0;
     lives = 3;
@@ -704,6 +720,8 @@ function winLevel() {
 
 // ゲームループ
 function gameLoop() {
+    if (!canvas || !ctx) return;
+    
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     
     // アニメーションフレームを更新
@@ -1025,3 +1043,32 @@ setTimeout(() => {
         gameState = 'playing';
     }
 }, 100);
+or('Failed to initialize canvas');
+        return;
+    }
+    
+    // キャンバスサイズを設定
+    setCanvasSize();
+    window.addEventListener('resize', setCanvasSize);
+    
+    // ゲームを初期化
+    init();
+    setupFlickController();
+    setupVirtualButtons();
+    gameLoop();
+    
+    // 自動的にゲームを開始
+    setTimeout(() => {
+        if (gameState === 'ready') {
+            gameState = 'playing';
+        }
+    }, 100);
+}
+
+// DOMContentLoadedイベントでゲームを開始
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', startGame);
+} else {
+    // DOMが既に読み込まれている場合は即座に開始
+    startGame();
+}
