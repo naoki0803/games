@@ -14,13 +14,18 @@ body {
   overscroll-behavior: none;
   touch-action: none;
 }
-#app { position: relative; width: 100%; height: 100vh; overflow: hidden; }
+#app { position: relative; width: 100%; height: 100vh; height: 100svh; height: 100dvh; overflow: hidden; display: grid; grid-template-rows: auto 1fr auto; }
+
+/* 上下バー */
+.bar { background: rgba(255,255,255,0.05); backdrop-filter: blur(4px); border-bottom: 1px solid rgba(255,255,255,0.12); }
+.bottom-bar { border-top: 1px solid rgba(255,255,255,0.12); border-bottom: 0; display: flex; align-items: center; justify-content: flex-end; gap: 12px; padding: 8px 12px; padding-bottom: calc(8px + env(safe-area-inset-bottom)); min-height: 56px; }
+.top-bar { padding: 8px 12px; padding-top: calc(8px + env(safe-area-inset-top)); }
+
+/* ステージ（キャンバスを内部フィット） */
+.stage { position: relative; overflow: hidden; }
 #gameCanvas { display: block; width: 100%; height: 100%; background: transparent; }
 
-.hud {
-  position: absolute; inset: 0 0 auto 0; display: flex; justify-content: space-between; align-items: center;
-  padding: 8px 12px; font-weight: 600; text-shadow: 0 1px 2px rgba(0,0,0,0.5);
-}
+.hud { display: flex; justify-content: space-between; align-items: center; font-weight: 600; text-shadow: 0 1px 2px rgba(0,0,0,0.5); }
 .hud-left, .hud-right { display: flex; gap: 12px; align-items: center; }
 .score, .highscore { background: rgba(255,255,255,0.06); padding: 4px 8px; border-radius: 8px; }
 .health { display: flex; gap: 8px; align-items: center; }
@@ -32,7 +37,7 @@ body {
 .btn.hidden { display: none; }
 .btn:active { transform: translateY(1px); box-shadow: 0 3px 0 rgba(0,0,0,0.25); }
 
-.overlay { position: absolute; inset: 0; display: grid; place-items: center; background: radial-gradient(800px 500px at 50% 30%, rgba(10,15,26,0.7), rgba(10,15,26,0.9)); }
+.overlay { position: absolute; inset: 0; display: grid; place-items: center; background: radial-gradient(800px 500px at 50% 30%, rgba(10,15,26,0.7), rgba(10,15,26,0.9)); z-index: 40; }
 .overlay.hidden { display: none; }
 .panel { background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.15); backdrop-filter: blur(6px); border-radius: 16px; padding: 24px; max-width: 600px; width: min(90vw, 560px); text-align: center; }
 .title { margin: 0 0 8px; letter-spacing: 1px; }
@@ -45,17 +50,12 @@ body {
 /* Canvas aesthetic helpers */
 .canvas-glow { filter: drop-shadow(0 0 12px rgba(87, 199, 255, 0.25)); }
 
-/* Mobile fire button */
-#fireBtn {
-  position: fixed;
-  right: 16px;
-  bottom: 16px;
-  z-index: 20;
-  padding: 14px 16px;
-  font-size: 16px;
-  border-radius: 999px;
-  opacity: 0.9;
-}
+/* Mobile fire button (下部バー内) */
+#fireBtn { padding: 10px 14px; font-size: 16px; border-radius: 999px; opacity: 0.95; }
 @media (min-width: 820px) {
   #fireBtn { display: none; }
 }
+
+/* 縦向き注意オーバーレイ */
+.rotate-overlay { position: fixed; inset: 0; display: none; align-items: center; justify-content: center; background: rgba(10,15,26,0.92); z-index: 50; text-align: center; padding: 24px; }
+.rotate-overlay .panel { background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.15); border-radius: 16px; padding: 20px; }
