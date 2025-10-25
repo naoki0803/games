@@ -2,7 +2,7 @@
 <html lang="ja">
   <head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
     <meta name="theme-color" content="#0b0f1a" />
     <title>Shmup Zero</title>
     <link rel="manifest" href="./manifest.json" />
@@ -33,7 +33,7 @@
       <div id="overlay" class="overlay hidden">
         <div class="panel">
           <h1 class="title">Shmup Zero</h1>
-          <p class="subtitle">ドラッグで移動 / 自動ショット、PC は矢印/WASD + スペース</p>
+          <p class="subtitle">ドラッグで移動 / 右下の発射ボタン長押しで射撃（PC: 矢印/WASD + スペース）</p>
           <div class="controls">
             <button id="startBtn" class="btn primary">ゲーム開始</button>
             <button id="restartBtn" class="btn hidden">もう一度</button>
@@ -42,6 +42,9 @@
         </div>
       </div>
     </div>
+
+    <!-- Mobile fire button -->
+    <button id="fireBtn" class="btn fire-btn" aria-label="発射">🚀 発射</button>
 
     <script type="module" src="./game.js"></script>
     <script>

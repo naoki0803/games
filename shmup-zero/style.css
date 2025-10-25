@@ -11,6 +11,8 @@ html, body { height: 100%; }
 body {
   margin: 0; background: radial-gradient(1200px 800px at 50% 30%, var(--bg2), var(--bg));
   color: var(--fg); font-family: system-ui, -apple-system, Segoe UI, Roboto, "Hiragino Kaku Gothic ProN", "Noto Sans JP", sans-serif;
+  overscroll-behavior: none;
+  touch-action: none;
 }
 #app { position: relative; width: 100%; height: 100vh; overflow: hidden; }
 #gameCanvas { display: block; width: 100%; height: 100%; background: transparent; }
@@ -42,3 +44,18 @@ body {
 
 /* Canvas aesthetic helpers */
 .canvas-glow { filter: drop-shadow(0 0 12px rgba(87, 199, 255, 0.25)); }
+
+/* Mobile fire button */
+#fireBtn {
+  position: fixed;
+  right: 16px;
+  bottom: 16px;
+  z-index: 20;
+  padding: 14px 16px;
+  font-size: 16px;
+  border-radius: 999px;
+  opacity: 0.9;
+}
+@media (min-width: 820px) {
+  #fireBtn { display: none; }
+}
