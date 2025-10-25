@@ -369,11 +369,25 @@ body {
     grid-template-columns: repeat(5, 1fr);
     grid-template-rows: repeat(5, 1fr);
     gap: 4px;
-    aspect-ratio: 1;
-    max-width: 100%;
-    min-height: 300px; /* aspect-ratioのフォールバック：最小高さを保証 */
+    aspect-ratio: 1 / 1;
+    width: 100%;
+    max-width: 500px;
+    height: auto;
     margin: 0 auto;
     touch-action: none;
+}
+
+/* フォールバック: aspect-ratioが効かない場合 */
+@supports not (aspect-ratio: 1 / 1) {
+    .puzzle-board {
+        height: 500px;
+    }
+    
+    @media (max-width: 600px) {
+        .puzzle-board {
+            height: calc(100vw - 80px);
+        }
+    }
 }
 
 .puzzle-tile {

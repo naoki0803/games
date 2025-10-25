@@ -1032,15 +1032,26 @@ function fireBullet() {
 }
 
 // ゲーム開始関数
+let gameStarted = false;
+
 function startGame() {
+    if (gameStarted) return; // 既に開始している場合は何もしない
+    
     if (!initCanvas()) {
         console.error('Failed to initialize canvas');
         return;
     }
     
+    gameStarted = true;
+    
     // キャンバスサイズを設定
     setCanvasSize();
-    window.addEventListener('resize', setCanvasSize);
+    
+    // リサイズイベントリスナーを一度だけ追加
+    if (!window.invaderResizeListenerAdded) {
+        window.addEventListener('resize', setCanvasSize);
+        window.invaderResizeListenerAdded = true;
+    }
     
     // ゲームを初期化
     init();
