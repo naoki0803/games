@@ -45,6 +45,10 @@ const highScoreEl = document.getElementById('highScoreValue');
 const healthFillEl = document.getElementById('healthFill');
 const finalStatsEl = document.getElementById('finalStats');
 const fireBtn = document.getElementById('fireBtn');
+// ステージ用モーダル
+const stageModalEl = document.getElementById('stageModal');
+const stageModalTitleEl = document.getElementById('stageModalTitle');
+const stageModalBtn = document.getElementById('stageModalBtn');
 
 // Game state
 const State = {
@@ -142,10 +146,29 @@ function drawStars(dt) {
 //（resizeCanvas 内で scatterStars を呼ぶため、ここで呼び出すのが安全）
 resizeCanvas();
 
-// Score
+// Score / Stage
 let score = 0;
 let highScore = Number(localStorage.getItem('shmupZeroHighScore') || 0);
 highScoreEl.textContent = highScore.toString();
+// スコアに応じたステージ閾値（1-indexed: [S1開始, S2開始, S3開始]）
+const STAGE_SCORE_THRESHOLDS = [0, 1000, 2500];
+let currentStage = 1;
+let pendingStage = 1;
+let stageTransitionPending = false;
+
+function getStageForScore(sc) {
+  if (sc >= STAGE_SCORE_THRESHOLDS[2]) return 3;
+  if (sc >= STAGE_SCORE_THRESHOLDS[1]) return 2;
+  return 1;
+}
+
+function pickEnemyTypeForStage(stage) {
+  if (stage === 1) return 'grunt';
+  if (stage === 2) return (rand() < 0.65) ? 'grunt' : 'shooter';
+  // stage 3: 全種類
+  const t = rand();
+  return t < 0.5 ? 'grunt' : (t < 0.8 ? 'shooter' : 'waver');
+}
 
 // Spawning
 let enemySpawnTimer = 0;
@@ -154,8 +177,7 @@ function spawnEnemy() {
   const h = canvas.height / renderScale;
   const y = 40 + rand() * (h - 80);
   // 敵タイプ: grunt(標準), shooter(射撃特化), waver(上下にランダム移動)
-  const t = rand();
-  const type = t < 0.5 ? 'grunt' : (t < 0.8 ? 'shooter' : 'waver');
+  const type = pickEnemyTypeForStage(currentStage);
   // 一回り小さく
   const radius = type === 'grunt' ? 12 : 14;
   const enemy = {
@@ -163,10 +185,12 @@ function spawnEnemy() {
     y,
     radius,
     hp: type === 'grunt' ? 1 : 3,
-    vx: - (world.speed * (1.0 + world.difficulty*0.05)) * (0.9 + rand()*0.4),
-    vy: (type === 'waver') ? (rand()-0.5) * 80 : (rand()-0.5) * 40,
+    // 敵の移動速度を20%低下
+    vx: - (world.speed * (1.0 + world.difficulty*0.05)) * (0.9 + rand()*0.4) * 0.8,
+    vy: (type === 'waver') ? (rand()-0.5) * 80 * 0.8 : (rand()-0.5) * 40 * 0.8,
     type,
-    fireCooldown: 0.6 + rand()*0.8,
+    // 攻撃頻度を20%低下（クールダウンを1.2倍）
+    fireCooldown: (0.6 + rand()*0.8) * 1.2,
   };
   // waver の上下ランダム変化タイマー
   if (type === 'waver') enemy.vyTimer = 0.5 + rand()*0.8;
@@ -186,28 +210,28 @@ function assignAttackPattern(e) {
     // シューターは複数回撃つタイプを優先
     e.pattern = 'multi_times';
     e.shotsRemaining = 3 + Math.floor(rand()*3); // 3-5回
-    e.fireCooldown = 0.5 + rand()*0.5;
+    e.fireCooldown = (0.5 + rand()*0.5) * 1.2;
     return;
   }
   const r = rand();
   if (r < 0.30) {
     e.pattern = 'single_once';
     e._attacked = false;
-    e.fireCooldown = 0.6 + rand()*0.6;
+    e.fireCooldown = (0.6 + rand()*0.6) * 1.2;
   } else if (r < 0.60) {
     e.pattern = 'multi_times';
     e.shotsRemaining = 2 + Math.floor(rand()*3); // 2-4回
-    e.fireCooldown = 0.6 + rand()*0.6;
+    e.fireCooldown = (0.6 + rand()*0.6) * 1.2;
   } else if (r < 0.85) {
     e.pattern = 'volley_once';
     e._attacked = false;
     e.bulletsPerVolley = 3 + Math.floor(rand()*2); // 3-4発
-    e.fireCooldown = 0.6 + rand()*0.8;
+    e.fireCooldown = (0.6 + rand()*0.8) * 1.2;
   } else {
     e.pattern = 'radial_once';
     e._attacked = false;
     e.radialCount = 8; // 8方向
-    e.fireCooldown = 0.7 + rand()*0.7;
+    e.fireCooldown = (0.7 + rand()*0.7) * 1.2;
   }
 }
 
@@ -228,7 +252,7 @@ function tryEnemyAttack(e) {
     if (!e.shotsRemaining || e.shotsRemaining <= 0) { e.fireCooldown = 9999; return; }
     shootTowards(e.x - 10, e.y, player.x, player.y, baseSpeed);
     e.shotsRemaining--;
-    e.fireCooldown = 0.5 + rand()*0.5; // 次弾までの間隔
+    e.fireCooldown = (0.5 + rand()*0.5) * 1.2; // 次弾までの間隔（頻度20%低下）
     if (e.shotsRemaining <= 0) e.fireCooldown = 9999;
   } else if (e.pattern === 'volley_once') {
     if (e._attacked) return;
@@ -341,6 +365,9 @@ function resetGame() {
   player.x = 100; player.y = canvas.height / renderScale / 2; player.hp = player.maxHp; player.fireCooldown = 0; player.alive = true; player.invul = 1.2;
   bullets.length = 0; enemies.length = 0; enemyBullets.length = 0; particles.length = 0;
   enemySpawnTimer = 0;
+  // ステージ状態を初期化
+  currentStage = 1; pendingStage = 1; stageTransitionPending = false;
+  if (stageModalEl) stageModalEl.classList.add('hidden');
   overlayEl.classList.add('hidden');
   restartBtn.classList.add('hidden');
   finalStatsEl.classList.add('hidden');
@@ -456,7 +483,7 @@ function loop(now) {
     // waver は上下速度を時々変更
     if (e.type === 'waver') {
       e.vyTimer -= dt;
-      if (e.vyTimer <= 0) { e.vy = (rand()-0.5) * 140; e.vyTimer = 0.5 + rand()*0.8; }
+      if (e.vyTimer <= 0) { e.vy = (rand()-0.5) * 140 * 0.8; e.vyTimer = 0.5 + rand()*0.8; }
       // 端で反転
       if ((e.y < 30 && e.vy < 0) || (e.y > h - 30 && e.vy > 0)) e.vy = -e.vy;
     }
@@ -522,6 +549,9 @@ function loop(now) {
   healthFillEl.style.width = `${clamp(player.hp / player.maxHp, 0, 1) * 100}%`;
   scoreEl.textContent = score.toString();
 
+  // ステージ進行チェック（スコア到達で自動）
+  checkStageProgression();
+
   // Game over
   if (player.hp <= 0 && player.alive) {
     player.alive = false;
@@ -556,6 +586,39 @@ function endGame() {
   finalStatsEl.textContent = `SCORE: ${score}`;
   if (score > highScore) { highScore = score; localStorage.setItem('shmupZeroHighScore', String(highScore)); }
   highScoreEl.textContent = highScore.toString();
+}
+
+// ステージクリア演出 & 再開
+function showStageClearModal(clearedStage) {
+  if (!stageModalEl || !stageModalTitleEl) return;
+  stageModalTitleEl.textContent = `ステージ${clearedStage}クリア！`;
+  stageModalEl.classList.remove('hidden');
+  gameState = State.Paused;
+  pauseBtn.textContent = '▶';
+}
+
+function checkStageProgression() {
+  if (stageTransitionPending || gameState !== State.Playing) return;
+  const s = getStageForScore(score);
+  if (s > currentStage) {
+    pendingStage = s;
+    stageTransitionPending = true;
+    showStageClearModal(currentStage);
+  }
+}
+
+if (stageModalBtn) {
+  stageModalBtn.addEventListener('click', () => {
+    if (!stageModalEl) return;
+    stageModalEl.classList.add('hidden');
+    currentStage = pendingStage;
+    stageTransitionPending = false;
+    if (gameState !== State.GameOver) {
+      gameState = State.Playing; pauseBtn.textContent = '⏸';
+      lastTime = performance.now();
+      requestAnimationFrame(loop);
+    }
+  });
 }
 
 // Initialize title screen
