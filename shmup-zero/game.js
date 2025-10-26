@@ -151,7 +151,8 @@ let score = 0;
 let highScore = Number(localStorage.getItem('shmupZeroHighScore') || 0);
 highScoreEl.textContent = highScore.toString();
 // スコアに応じたステージ閾値（1-indexed: [S1開始, S2開始, S3開始]）
-const STAGE_SCORE_THRESHOLDS = [0, 1000, 2500];
+// ステージを5000ポイント毎に進行: S1=0, S2=5000, S3=10000
+const STAGE_SCORE_THRESHOLDS = [0, 5000, 10000];
 let currentStage = 1;
 let pendingStage = 1;
 let stageTransitionPending = false;
@@ -206,6 +207,13 @@ function spawnEnemy() {
 // - volley_once: 一回だけ複数発（狭い拡散）
 // - radial_once: 一回だけ全方位
 function assignAttackPattern(e) {
+  // ステージ1では「1方向にのみ撃つ」シンプルな敵に限定
+  if (currentStage === 1) {
+    e.pattern = 'fixed_dir'; // 左方向へ固定射撃
+    e.fireCooldown = (0.7 + rand()*0.7) * 1.2;
+    return;
+  }
+
   if (e.type === 'shooter') {
     // シューターは複数回撃つタイプを優先
     e.pattern = 'multi_times';
@@ -279,6 +287,10 @@ function tryEnemyAttack(e) {
     }
     e._attacked = true;
     e.fireCooldown = 9999;
+  } else if (e.pattern === 'fixed_dir') {
+    // ステージ1専用: 左方向（プレイヤー非追尾）にのみ射撃を繰り返す
+    enemyBullets.push({ x: e.x - 10, y: e.y, vx: -baseSpeed, vy: 0, radius: 4 });
+    e.fireCooldown = (0.6 + rand()*0.8) * 1.2;
   }
 }
 
