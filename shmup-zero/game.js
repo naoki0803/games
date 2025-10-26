@@ -87,6 +87,9 @@ const player = {
   fireRate: 0.30, // seconds between shots
   alive: true,
   invul: 0,
+  // シールド（被弾/接触無効化チャージ）
+  shieldCharges: 0,
+  maxShieldCharges: 5,
 };
 
 // 自動射撃フラグ（true で常に自動射撃）
@@ -98,6 +101,7 @@ const enemies = []; // {x,y,radius,hp,vx,vy,type,fireCooldown}
 const enemyBullets = []; // {x,y,vx,vy,radius}
 const particles = []; // {x,y,vx,vy,life,color,size}
 const healItems = []; // {x,y,vx,vy,radius}
+const shieldItems = []; // {x,y,vx,vy,radius}
 
 let input = {
   up: false, down: false, left: false, right: false, shoot: false,
@@ -170,6 +174,22 @@ function pickEnemyTypeForStage(stage) {
   // stage 3: 全種類
   const t = rand();
   return t < 0.5 ? 'grunt' : (t < 0.8 ? 'shooter' : 'waver');
+}
+
+// ステージごとの同時出現上限（種類が増えても総数が暴れないよう制限）
+function getMaxEnemiesForStage(stage) {
+  if (stage === 1) return 8;
+  if (stage === 2) return 6;
+  // stage 3
+  return 6;
+}
+
+// ステージごとの出現間隔と同時出現確率の調整
+function getSpawnTuningForStage(stage) {
+  if (stage === 1) return { intervalMul: 1.5, extraChance: 0.25 };
+  if (stage === 2) return { intervalMul: 2.1, extraChance: 0.12 };
+  // stage 3
+  return { intervalMul: 2.4, extraChance: 0.08 };
 }
 
 // Spawning
@@ -376,7 +396,8 @@ function resetGame() {
   score = 0;
   world.scrollX = 0; world.time = 0; world.difficulty = 1;
   player.x = 100; player.y = canvas.height / renderScale / 2; player.hp = player.maxHp; player.fireCooldown = 0; player.alive = true; player.invul = 1.2;
-  bullets.length = 0; enemies.length = 0; enemyBullets.length = 0; particles.length = 0; healItems.length = 0;
+  player.shieldCharges = 0;
+  bullets.length = 0; enemies.length = 0; enemyBullets.length = 0; particles.length = 0; healItems.length = 0; shieldItems.length = 0;
   enemySpawnTimer = 0;
   // ステージ状態を初期化
   currentStage = 1; pendingStage = 1; stageTransitionPending = false;
@@ -444,6 +465,21 @@ function drawHealItem(x, y, r) {
   ctx.restore();
 }
 
+function drawShieldItem(x, y, r) {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.strokeStyle = '#7cc7ff';
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  ctx.arc(0, 0, r, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.fillStyle = 'rgba(124,199,255,0.25)';
+  ctx.beginPath();
+  ctx.arc(0, 0, Math.max(2, r - 2), 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+}
+
 function drawParticles(dt) {
   for (let i = particles.length - 1; i >= 0; i--) {
     const p = particles[i];
@@ -491,16 +527,22 @@ function loop(now) {
     bullets.push({ x: player.x + 14, y: player.y, vx: 520, vy: 0, radius: 4, from: 'player' });
   }
 
-  // Enemies spawn（出現数増加）
+  // Enemies spawn（ステージ2/3で全体頻度を抑制しつつ同時数を制限）
   enemySpawnTimer -= dt;
   if (enemySpawnTimer <= 0) {
-    spawnEnemy();
-    // 追加で同時出現のチャンス
-    if (rand() < 0.25) spawnEnemy();
-    // ベース間隔を短縮（時間経過で最短 ~0.3s 程度）
+    const tuning = getSpawnTuningForStage(currentStage);
     const base = 0.7 - Math.min(0.4, world.time * 0.02);
-    // 出現頻度をさらに低下させるため、待ち時間を1.5倍
-    enemySpawnTimer = base * (0.9 + rand()*0.3) * 1.5;
+    const nextInterval = base * (0.9 + rand()*0.3) * tuning.intervalMul;
+    const maxEnemies = getMaxEnemiesForStage(currentStage);
+    if (enemies.length >= maxEnemies) {
+      enemySpawnTimer = nextInterval;
+    } else {
+      spawnEnemy();
+      if (enemies.length < maxEnemies && rand() < tuning.extraChance) {
+        spawnEnemy();
+      }
+      enemySpawnTimer = nextInterval;
+    }
   }
 
   // Update enemies（移動 + 攻撃）
@@ -545,6 +587,21 @@ function loop(now) {
     }
   }
 
+  // シールドアイテムの更新・取得判定
+  for (let i = shieldItems.length - 1; i >= 0; i--) {
+    const it = shieldItems[i];
+    it.x += it.vx * dt; it.y += it.vy * dt;
+    it.vy += 30 * dt; // 緩やかな重力
+    if (it.x < -20 || it.y < -20 || it.y > h + 20) { shieldItems.splice(i,1); continue; }
+    if (player.alive && circleOverlap(player.x, player.y, player.radius, it.x, it.y, it.radius)) {
+      const addCharges = 3; // 一定回数の無効化（3回）
+      player.shieldCharges = Math.min(player.maxShieldCharges, player.shieldCharges + addCharges);
+      addExplosion(it.x, it.y, '#7cc7ff', 14);
+      shieldItems.splice(i,1);
+      continue;
+    }
+  }
+
   // Collisions - bullets vs enemies
   for (let i = enemies.length - 1; i >= 0; i--) {
     const e = enemies[i];
@@ -556,9 +613,12 @@ function loop(now) {
         addExplosion(b.x, b.y, '#9bffb0', 6);
         if (e.hp <= 0) {
           addExplosion(e.x, e.y, '#ffdf6b', 20);
-          // 低確率で回復アイテムをドロップ（5%）
-          if (rand() < 0.05) {
+          // 低確率でアイテムをドロップ（総量は抑えつつ種別を増やす）
+          const dropRoll = rand();
+          if (dropRoll < 0.05) {
             healItems.push({ x: e.x, y: e.y, vx: -80, vy: (rand()-0.5)*40, radius: 8 });
+          } else if (dropRoll < 0.08) {
+            shieldItems.push({ x: e.x, y: e.y, vx: -80, vy: (rand()-0.5)*40, radius: 10 });
           }
           enemies.splice(i,1);
           score += 50 + Math.floor(world.difficulty * 10);
@@ -576,7 +636,13 @@ function loop(now) {
       if (circleOverlap(player.x, player.y, player.radius, b.x, b.y, b.radius)) {
         enemyBullets.splice(i,1);
         if (player.invul <= 0) {
-          player.hp -= 20; player.invul = 0.5; addExplosion(player.x, player.y, '#57c7ff', 10);
+          if (player.shieldCharges > 0) {
+            player.shieldCharges -= 1;
+            player.invul = 0.2; // 多重ヒット防止の短い無敵
+            addExplosion(player.x, player.y, '#7cc7ff', 12);
+          } else {
+            player.hp -= 20; player.invul = 0.5; addExplosion(player.x, player.y, '#57c7ff', 10);
+          }
         }
       }
     }
@@ -585,7 +651,13 @@ function loop(now) {
       if (circleOverlap(player.x, player.y, player.radius, e.x, e.y, e.radius)) {
         enemies.splice(i,1);
         if (player.invul <= 0) {
-          player.hp -= 30; player.invul = 0.6; addExplosion(player.x, player.y, '#ff6b6b', 12);
+          if (player.shieldCharges > 0) {
+            player.shieldCharges -= 1;
+            player.invul = 0.25;
+            addExplosion(player.x, player.y, '#7cc7ff', 14);
+          } else {
+            player.hp -= 30; player.invul = 0.6; addExplosion(player.x, player.y, '#ff6b6b', 12);
+          }
         }
       }
     }
@@ -609,6 +681,17 @@ function loop(now) {
   if (player.alive) {
     const blink = player.invul > 0 ? (Math.floor(world.time * 20) % 2 === 0) : true;
     if (blink) drawShip(player.x, player.y, '#57c7ff', player.radius);
+    // シールド可視化
+    if (player.shieldCharges > 0) {
+      ctx.save();
+      ctx.strokeStyle = 'rgba(124,199,255,0.9)';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      const pulse = 2 * Math.sin(world.time * 6) + 4;
+      ctx.arc(player.x, player.y, player.radius + pulse, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.restore();
+    }
   }
 
   // Draw enemies
@@ -617,6 +700,8 @@ function loop(now) {
   // Draw bullets
   // 回復アイテム
   for (const it of healItems) drawHealItem(it.x, it.y, it.radius);
+  // シールドアイテム
+  for (const it of shieldItems) drawShieldItem(it.x, it.y, it.radius);
 
   for (const b of bullets) drawBullet(b.x, b.y, b.radius, '#9bffb0');
   for (const b of enemyBullets) drawBullet(b.x, b.y, b.radius, '#ff9b9b');
