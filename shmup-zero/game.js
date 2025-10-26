@@ -79,10 +79,14 @@ const player = {
   hp: 100,
   maxHp: 100,
   fireCooldown: 0,
-  fireRate: 0.12, // seconds between shots
+  // 連射が多すぎたため、発射間隔をやや長めにする
+  fireRate: 0.20, // seconds between shots
   alive: true,
   invul: 0,
 };
+
+// 自動射撃フラグ（true で常に自動射撃）
+const AUTO_FIRE = true;
 
 // Entities
 const bullets = []; // {x,y,vx,vy,radius,from}
@@ -149,18 +153,109 @@ function spawnEnemy() {
   const w = canvas.width / renderScale;
   const h = canvas.height / renderScale;
   const y = 40 + rand() * (h - 80);
-  const type = rand() < 0.75 ? 'grunt' : 'shooter';
-  const radius = type === 'grunt' ? 16 : 18;
-  enemies.push({
+  // 敵タイプ: grunt(標準), shooter(射撃特化), waver(上下にランダム移動)
+  const t = rand();
+  const type = t < 0.5 ? 'grunt' : (t < 0.8 ? 'shooter' : 'waver');
+  // 一回り小さく
+  const radius = type === 'grunt' ? 12 : 14;
+  const enemy = {
     x: w + 40,
     y,
     radius,
     hp: type === 'grunt' ? 1 : 3,
     vx: - (world.speed * (1.0 + world.difficulty*0.05)) * (0.9 + rand()*0.4),
-    vy: (rand()-0.5) * 40,
+    vy: (type === 'waver') ? (rand()-0.5) * 80 : (rand()-0.5) * 40,
     type,
-    fireCooldown: 0.8 + rand()*0.6,
-  });
+    fireCooldown: 0.6 + rand()*0.8,
+  };
+  // waver の上下ランダム変化タイマー
+  if (type === 'waver') enemy.vyTimer = 0.5 + rand()*0.8;
+
+  // すべての敵に攻撃パターンを付与（何もしない敵を排除）
+  assignAttackPattern(enemy);
+  enemies.push(enemy);
+}
+
+// 敵の攻撃パターンを割り当て
+// - single_once: 一回だけ単発
+// - multi_times: 複数回に分けて単発
+// - volley_once: 一回だけ複数発（狭い拡散）
+// - radial_once: 一回だけ全方位
+function assignAttackPattern(e) {
+  if (e.type === 'shooter') {
+    // シューターは複数回撃つタイプを優先
+    e.pattern = 'multi_times';
+    e.shotsRemaining = 3 + Math.floor(rand()*3); // 3-5回
+    e.fireCooldown = 0.5 + rand()*0.5;
+    return;
+  }
+  const r = rand();
+  if (r < 0.30) {
+    e.pattern = 'single_once';
+    e._attacked = false;
+    e.fireCooldown = 0.6 + rand()*0.6;
+  } else if (r < 0.60) {
+    e.pattern = 'multi_times';
+    e.shotsRemaining = 2 + Math.floor(rand()*3); // 2-4回
+    e.fireCooldown = 0.6 + rand()*0.6;
+  } else if (r < 0.85) {
+    e.pattern = 'volley_once';
+    e._attacked = false;
+    e.bulletsPerVolley = 3 + Math.floor(rand()*2); // 3-4発
+    e.fireCooldown = 0.6 + rand()*0.8;
+  } else {
+    e.pattern = 'radial_once';
+    e._attacked = false;
+    e.radialCount = 8; // 8方向
+    e.fireCooldown = 0.7 + rand()*0.7;
+  }
+}
+
+function shootTowards(x, y, tx, ty, speed, radius = 4) {
+  const dx = tx - x; const dy = ty - y; const len = Math.hypot(dx, dy) || 1;
+  const sp = speed;
+  enemyBullets.push({ x, y, vx: dx/len*sp, vy: dy/len*sp, radius });
+}
+
+function tryEnemyAttack(e) {
+  const baseSpeed = 180 + rand()*80;
+  if (e.pattern === 'single_once') {
+    if (e._attacked) return; // 既に一回撃った
+    shootTowards(e.x - 10, e.y, player.x, player.y, baseSpeed);
+    e._attacked = true;
+    e.fireCooldown = 9999; // もう撃たない
+  } else if (e.pattern === 'multi_times') {
+    if (!e.shotsRemaining || e.shotsRemaining <= 0) { e.fireCooldown = 9999; return; }
+    shootTowards(e.x - 10, e.y, player.x, player.y, baseSpeed);
+    e.shotsRemaining--;
+    e.fireCooldown = 0.5 + rand()*0.5; // 次弾までの間隔
+    if (e.shotsRemaining <= 0) e.fireCooldown = 9999;
+  } else if (e.pattern === 'volley_once') {
+    if (e._attacked) return;
+    const n = Math.max(3, e.bulletsPerVolley || 3);
+    const baseAngle = Math.atan2(player.y - e.y, player.x - e.x);
+    const totalSpread = 20 * Math.PI / 180; // 20度の拡散
+    for (let k = 0; k < n; k++) {
+      const t = (n === 1) ? 0 : (k - (n-1)/2) / (n-1);
+      const ang = baseAngle + t * totalSpread;
+      const vx = Math.cos(ang) * baseSpeed;
+      const vy = Math.sin(ang) * baseSpeed;
+      enemyBullets.push({ x: e.x - 10, y: e.y, vx, vy, radius: 4 });
+    }
+    e._attacked = true;
+    e.fireCooldown = 9999;
+  } else if (e.pattern === 'radial_once') {
+    if (e._attacked) return;
+    const n = e.radialCount || 8;
+    for (let k = 0; k < n; k++) {
+      const ang = (Math.PI * 2) * (k / n);
+      const vx = Math.cos(ang) * (150 + rand()*70);
+      const vy = Math.sin(ang) * (150 + rand()*70);
+      enemyBullets.push({ x: e.x, y: e.y, vx, vy, radius: 4 });
+    }
+    e._attacked = true;
+    e.fireCooldown = 9999;
+  }
 }
 
 function addExplosion(x, y, color = '#57c7ff', count = 16) {
@@ -281,9 +376,13 @@ function drawEnemy(x, y, type, r) {
     ctx.fillStyle = '#ff6b6b';
     ctx.beginPath(); ctx.arc(0,0,r,0,Math.PI*2); ctx.fill();
     ctx.fillStyle = 'white'; ctx.fillRect(-r*0.5,-2,r,4);
-  } else {
+  } else if (type === 'shooter') {
     ctx.fillStyle = '#ffb86b';
     ctx.beginPath(); ctx.moveTo(-r, -r); ctx.lineTo(r*0.4, 0); ctx.lineTo(-r, r); ctx.closePath(); ctx.fill();
+  } else { // waver
+    ctx.fillStyle = '#ffa3d1';
+    ctx.beginPath(); ctx.arc(0,0,r,0,Math.PI*2); ctx.fill();
+    ctx.fillStyle = 'white'; ctx.fillRect(-r*0.6,-r*0.15,r*1.2,r*0.3);
   }
   ctx.restore();
 }
@@ -331,37 +430,39 @@ function loop(now) {
   player.x = clamp(player.x, 16, w - 16);
   player.y = clamp(player.y, 16, h - 16);
 
-  // Shooting
+  // Shooting（自動発射対応）
   player.fireCooldown -= dt;
-  if (input.shoot && player.fireCooldown <= 0) {
+  if ((AUTO_FIRE || input.shoot) && player.fireCooldown <= 0) {
     player.fireCooldown = player.fireRate;
+    // 一度に出る弾数を減らし、常に1発に統一
     bullets.push({ x: player.x + 14, y: player.y, vx: 520, vy: 0, radius: 4, from: 'player' });
-    // side shots at higher difficulty
-    if (world.difficulty >= 3) bullets.push({ x: player.x + 10, y: player.y - 10, vx: 520, vy: -60, radius: 3, from: 'player' });
-    if (world.difficulty >= 5) bullets.push({ x: player.x + 10, y: player.y + 10, vx: 520, vy: 60, radius: 3, from: 'player' });
   }
 
-  // Enemies spawn
+  // Enemies spawn（出現数増加）
   enemySpawnTimer -= dt;
   if (enemySpawnTimer <= 0) {
     spawnEnemy();
-    const base = 1.0 - Math.min(0.6, world.time * 0.01);
+    // 追加で同時出現のチャンス
+    if (rand() < 0.25) spawnEnemy();
+    // ベース間隔を短縮（時間経過で最短 ~0.3s 程度）
+    const base = 0.7 - Math.min(0.4, world.time * 0.02);
     enemySpawnTimer = base * (0.9 + rand()*0.3);
   }
 
-  // Update enemies
+  // Update enemies（移動 + 攻撃）
   for (let i = enemies.length - 1; i >= 0; i--) {
     const e = enemies[i];
     e.x += e.vx * dt; e.y += e.vy * dt;
-    if (e.type === 'shooter') {
-      e.fireCooldown -= dt;
-      if (e.fireCooldown <= 0) {
-        e.fireCooldown = 0.8 + rand()*0.6;
-        const dx = player.x - e.x; const dy = player.y - e.y; const len = Math.hypot(dx, dy) || 1;
-        const sp = 180 + rand()*80;
-        enemyBullets.push({ x: e.x - 10, y: e.y, vx: dx/len*sp, vy: dy/len*sp, radius: 4 });
-      }
+    // waver は上下速度を時々変更
+    if (e.type === 'waver') {
+      e.vyTimer -= dt;
+      if (e.vyTimer <= 0) { e.vy = (rand()-0.5) * 140; e.vyTimer = 0.5 + rand()*0.8; }
+      // 端で反転
+      if ((e.y < 30 && e.vy < 0) || (e.y > h - 30 && e.vy > 0)) e.vy = -e.vy;
     }
+    // 全ての敵が攻撃
+    e.fireCooldown -= dt;
+    if (e.fireCooldown <= 0) tryEnemyAttack(e);
     if (e.x < -40 || e.y < -60 || e.y > h + 60) { enemies.splice(i, 1); continue; }
   }
 
@@ -372,7 +473,7 @@ function loop(now) {
   }
   for (let i = enemyBullets.length - 1; i >= 0; i--) {
     const b = enemyBullets[i]; b.x += b.vx * dt; b.y += b.vy * dt;
-    if (b.x < -20 || b.y < -20 || b.y > h + 20) { enemyBullets.splice(i,1); continue; }
+    if (b.x < -20 || b.x > w + 20 || b.y < -20 || b.y > h + 20) { enemyBullets.splice(i,1); continue; }
   }
 
   // Collisions - bullets vs enemies
