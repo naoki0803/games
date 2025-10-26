@@ -102,6 +102,13 @@ const enemyBullets = []; // {x,y,vx,vy,radius}
 const particles = []; // {x,y,vx,vy,life,color,size}
 const healItems = []; // {x,y,vx,vy,radius}
 const shieldItems = []; // {x,y,vx,vy,radius}
+const companionItems = []; // {x,y,vx,vy,radius}
+const companions = []; // {offsetY, fireCooldown}
+
+// Companions (子機)
+const MAX_COMPANIONS = 2;
+const COMPANION_OFFSET_Y = 18; // 上下に並ぶ距離
+const COMPANION_FIRE_RATE = 0.65; // メインより遅い
 
 let input = {
   up: false, down: false, left: false, right: false, shoot: false,
@@ -397,7 +404,7 @@ function resetGame() {
   world.scrollX = 0; world.time = 0; world.difficulty = 1;
   player.x = 100; player.y = canvas.height / renderScale / 2; player.hp = player.maxHp; player.fireCooldown = 0; player.alive = true; player.invul = 1.2;
   player.shieldCharges = 0;
-  bullets.length = 0; enemies.length = 0; enemyBullets.length = 0; particles.length = 0; healItems.length = 0; shieldItems.length = 0;
+  bullets.length = 0; enemies.length = 0; enemyBullets.length = 0; particles.length = 0; healItems.length = 0; shieldItems.length = 0; companionItems.length = 0; companions.length = 0;
   enemySpawnTimer = 0;
   // ステージ状態を初期化
   currentStage = 1; pendingStage = 1; stageTransitionPending = false;
@@ -480,6 +487,32 @@ function drawShieldItem(x, y, r) {
   ctx.restore();
 }
 
+function drawCompanionItem(x, y, r) {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.fillStyle = '#d1b3ff';
+  ctx.beginPath();
+  ctx.arc(0, 0, r, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(-r * 0.5, -1.5, r, 3); // 横バー
+  ctx.fillRect(-1.5, -r * 0.5, 3, r); // 縦バー
+  ctx.restore();
+}
+
+function drawCompanion(x, y) {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.fillStyle = '#b08cff';
+  ctx.beginPath();
+  ctx.moveTo(-8, -6);
+  ctx.lineTo(8, 0);
+  ctx.lineTo(-8, 6);
+  ctx.closePath();
+  ctx.fill();
+  ctx.restore();
+}
+
 function drawParticles(dt) {
   for (let i = particles.length - 1; i >= 0; i--) {
     const p = particles[i];
@@ -525,6 +558,19 @@ function loop(now) {
     player.fireCooldown = player.fireRate;
     // 一度に出る弾数を減らし、常に1発に統一
     bullets.push({ x: player.x + 14, y: player.y, vx: 520, vy: 0, radius: 4, from: 'player' });
+  }
+
+  // Companion follow + shooting
+  for (const c of companions) {
+    // 位置は常にプレイヤーのすぐ横（少し下）
+    const cx = player.x - 4; // わずかに後ろ
+    const cy = player.y + c.offsetY;
+    c.x = cx; c.y = cy;
+    c.fireCooldown = (c.fireCooldown || 0) - dt;
+    if ((AUTO_FIRE || input.shoot) && c.fireCooldown <= 0) {
+      c.fireCooldown = COMPANION_FIRE_RATE;
+      bullets.push({ x: cx + 10, y: cy, vx: 480, vy: 0, radius: 3.5, from: 'companion' });
+    }
   }
 
   // Enemies spawn（ステージ2/3で全体頻度を抑制しつつ同時数を制限）
@@ -602,23 +648,44 @@ function loop(now) {
     }
   }
 
+  // 子機アイテムの更新・取得判定（出現頻度は他アイテムと同等）
+  for (let i = companionItems.length - 1; i >= 0; i--) {
+    const it = companionItems[i];
+    it.x += it.vx * dt; it.y += it.vy * dt;
+    it.vy += 30 * dt;
+    if (it.x < -20 || it.y < -20 || it.y > h + 20) { companionItems.splice(i,1); continue; }
+    if (player.alive && circleOverlap(player.x, player.y, player.radius, it.x, it.y, it.radius)) {
+      if (companions.length < MAX_COMPANIONS) {
+        const idx = companions.length; // 0 or 1
+        const offsetY = idx === 0 ? -COMPANION_OFFSET_Y : COMPANION_OFFSET_Y;
+        companions.push({ offsetY, fireCooldown: 0 });
+        addExplosion(it.x, it.y, '#d1b3ff', 12);
+      }
+      companionItems.splice(i,1);
+      continue;
+    }
+  }
+
   // Collisions - bullets vs enemies
   for (let i = enemies.length - 1; i >= 0; i--) {
     const e = enemies[i];
     for (let j = bullets.length - 1; j >= 0; j--) {
-      const b = bullets[j]; if (b.from !== 'player') continue;
+      const b = bullets[j]; if (b.from !== 'player' && b.from !== 'companion') continue;
       if (circleOverlap(e.x, e.y, e.radius, b.x, b.y, b.radius)) {
         bullets.splice(j,1);
         e.hp -= 1;
         addExplosion(b.x, b.y, '#9bffb0', 6);
-        if (e.hp <= 0) {
+    if (e.hp <= 0) {
           addExplosion(e.x, e.y, '#ffdf6b', 20);
           // 低確率でアイテムをドロップ（総量は抑えつつ種別を増やす）
           const dropRoll = rand();
+          // 出現頻度は他アイテムと同等（累積確率を均等に近づける）
           if (dropRoll < 0.05) {
             healItems.push({ x: e.x, y: e.y, vx: -80, vy: (rand()-0.5)*40, radius: 8 });
           } else if (dropRoll < 0.08) {
             shieldItems.push({ x: e.x, y: e.y, vx: -80, vy: (rand()-0.5)*40, radius: 10 });
+      } else if (dropRoll < 0.11) { // 子機アイテムの確率は他と同じ3%幅
+            companionItems.push({ x: e.x, y: e.y, vx: -80, vy: (rand()-0.5)*40, radius: 9 });
           }
           enemies.splice(i,1);
           score += 50 + Math.floor(world.difficulty * 10);
@@ -698,10 +765,16 @@ function loop(now) {
   for (const e of enemies) drawEnemy(e.x, e.y, e.type, e.radius);
 
   // Draw bullets
+  // 子機
+  for (const c of companions) {
+    if (player.alive) drawCompanion(c.x ?? (player.x - 4), c.y ?? (player.y + c.offsetY));
+  }
   // 回復アイテム
   for (const it of healItems) drawHealItem(it.x, it.y, it.radius);
   // シールドアイテム
   for (const it of shieldItems) drawShieldItem(it.x, it.y, it.radius);
+  // 子機アイテム
+  for (const it of companionItems) drawCompanionItem(it.x, it.y, it.radius);
 
   for (const b of bullets) drawBullet(b.x, b.y, b.radius, '#9bffb0');
   for (const b of enemyBullets) drawBullet(b.x, b.y, b.radius, '#ff9b9b');
