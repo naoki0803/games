@@ -83,8 +83,8 @@ const player = {
   hp: 100,
   maxHp: 100,
   fireCooldown: 0,
-  // 連射が多すぎたため、発射間隔をやや長めにする
-  fireRate: 0.20, // seconds between shots
+  // 連射が多すぎたため、発射間隔をさらに長めにする
+  fireRate: 0.30, // seconds between shots
   alive: true,
   invul: 0,
 };
@@ -97,6 +97,7 @@ const bullets = []; // {x,y,vx,vy,radius,from}
 const enemies = []; // {x,y,radius,hp,vx,vy,type,fireCooldown}
 const enemyBullets = []; // {x,y,vx,vy,radius}
 const particles = []; // {x,y,vx,vy,life,color,size}
+const healItems = []; // {x,y,vx,vy,radius}
 
 let input = {
   up: false, down: false, left: false, right: false, shoot: false,
@@ -210,7 +211,7 @@ function assignAttackPattern(e) {
   // ステージ1では「1方向にのみ撃つ」シンプルな敵に限定
   if (currentStage === 1) {
     e.pattern = 'fixed_dir'; // 左方向へ固定射撃
-    e.fireCooldown = (0.7 + rand()*0.7) * 1.2;
+    e.fireCooldown = (0.7 + rand()*0.7) * 1.4;
     return;
   }
 
@@ -218,28 +219,28 @@ function assignAttackPattern(e) {
     // シューターは複数回撃つタイプを優先
     e.pattern = 'multi_times';
     e.shotsRemaining = 3 + Math.floor(rand()*3); // 3-5回
-    e.fireCooldown = (0.5 + rand()*0.5) * 1.2;
+    e.fireCooldown = (0.5 + rand()*0.5) * 1.4;
     return;
   }
   const r = rand();
   if (r < 0.30) {
     e.pattern = 'single_once';
     e._attacked = false;
-    e.fireCooldown = (0.6 + rand()*0.6) * 1.2;
+    e.fireCooldown = (0.6 + rand()*0.6) * 1.4;
   } else if (r < 0.60) {
     e.pattern = 'multi_times';
     e.shotsRemaining = 2 + Math.floor(rand()*3); // 2-4回
-    e.fireCooldown = (0.6 + rand()*0.6) * 1.2;
+    e.fireCooldown = (0.6 + rand()*0.6) * 1.4;
   } else if (r < 0.85) {
     e.pattern = 'volley_once';
     e._attacked = false;
     e.bulletsPerVolley = 3 + Math.floor(rand()*2); // 3-4発
-    e.fireCooldown = (0.6 + rand()*0.8) * 1.2;
+    e.fireCooldown = (0.6 + rand()*0.8) * 1.4;
   } else {
     e.pattern = 'radial_once';
     e._attacked = false;
     e.radialCount = 8; // 8方向
-    e.fireCooldown = (0.7 + rand()*0.7) * 1.2;
+    e.fireCooldown = (0.7 + rand()*0.7) * 1.4;
   }
 }
 
@@ -260,7 +261,7 @@ function tryEnemyAttack(e) {
     if (!e.shotsRemaining || e.shotsRemaining <= 0) { e.fireCooldown = 9999; return; }
     shootTowards(e.x - 10, e.y, player.x, player.y, baseSpeed);
     e.shotsRemaining--;
-    e.fireCooldown = (0.5 + rand()*0.5) * 1.2; // 次弾までの間隔（頻度20%低下）
+    e.fireCooldown = (0.5 + rand()*0.5) * 1.5; // 次弾までの間隔をさらに延長
     if (e.shotsRemaining <= 0) e.fireCooldown = 9999;
   } else if (e.pattern === 'volley_once') {
     if (e._attacked) return;
@@ -290,7 +291,7 @@ function tryEnemyAttack(e) {
   } else if (e.pattern === 'fixed_dir') {
     // ステージ1専用: 左方向（プレイヤー非追尾）にのみ射撃を繰り返す
     enemyBullets.push({ x: e.x - 10, y: e.y, vx: -baseSpeed, vy: 0, radius: 4 });
-    e.fireCooldown = (0.6 + rand()*0.8) * 1.2;
+    e.fireCooldown = (0.6 + rand()*0.8) * 1.5;
   }
 }
 
@@ -375,7 +376,7 @@ function resetGame() {
   score = 0;
   world.scrollX = 0; world.time = 0; world.difficulty = 1;
   player.x = 100; player.y = canvas.height / renderScale / 2; player.hp = player.maxHp; player.fireCooldown = 0; player.alive = true; player.invul = 1.2;
-  bullets.length = 0; enemies.length = 0; enemyBullets.length = 0; particles.length = 0;
+  bullets.length = 0; enemies.length = 0; enemyBullets.length = 0; particles.length = 0; healItems.length = 0;
   enemySpawnTimer = 0;
   // ステージ状態を初期化
   currentStage = 1; pendingStage = 1; stageTransitionPending = false;
@@ -428,6 +429,19 @@ function drawEnemy(x, y, type, r) {
 
 function drawBullet(x,y,r,color) {
   ctx.save(); ctx.fillStyle = color; ctx.beginPath(); ctx.arc(x,y,r,0,Math.PI*2); ctx.fill(); ctx.restore();
+}
+
+function drawHealItem(x, y, r) {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.fillStyle = '#42d392';
+  ctx.beginPath();
+  ctx.arc(0, 0, r, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = 'white';
+  ctx.fillRect(-r * 0.6, -2, r * 1.2, 4);
+  ctx.fillRect(-2, -r * 0.6, 4, r * 1.2);
+  ctx.restore();
 }
 
 function drawParticles(dt) {
@@ -485,8 +499,8 @@ function loop(now) {
     if (rand() < 0.25) spawnEnemy();
     // ベース間隔を短縮（時間経過で最短 ~0.3s 程度）
     const base = 0.7 - Math.min(0.4, world.time * 0.02);
-    // 出現頻度を20%低下させるため、待ち時間を1.25倍
-    enemySpawnTimer = base * (0.9 + rand()*0.3) * 1.25;
+    // 出現頻度をさらに低下させるため、待ち時間を1.5倍
+    enemySpawnTimer = base * (0.9 + rand()*0.3) * 1.5;
   }
 
   // Update enemies（移動 + 攻撃）
@@ -516,6 +530,21 @@ function loop(now) {
     if (b.x < -20 || b.x > w + 20 || b.y < -20 || b.y > h + 20) { enemyBullets.splice(i,1); continue; }
   }
 
+  // 回復アイテムの更新・取得判定
+  for (let i = healItems.length - 1; i >= 0; i--) {
+    const it = healItems[i];
+    it.x += it.vx * dt; it.y += it.vy * dt;
+    it.vy += 30 * dt; // 緩やかな重力
+    if (it.x < -20 || it.y < -20 || it.y > h + 20) { healItems.splice(i,1); continue; }
+    if (player.alive && circleOverlap(player.x, player.y, player.radius, it.x, it.y, it.radius)) {
+      const healAmount = Math.floor(player.maxHp * 0.2);
+      player.hp = Math.min(player.maxHp, player.hp + healAmount);
+      addExplosion(it.x, it.y, '#42d392', 14);
+      healItems.splice(i,1);
+      continue;
+    }
+  }
+
   // Collisions - bullets vs enemies
   for (let i = enemies.length - 1; i >= 0; i--) {
     const e = enemies[i];
@@ -527,6 +556,10 @@ function loop(now) {
         addExplosion(b.x, b.y, '#9bffb0', 6);
         if (e.hp <= 0) {
           addExplosion(e.x, e.y, '#ffdf6b', 20);
+          // 低確率で回復アイテムをドロップ（5%）
+          if (rand() < 0.05) {
+            healItems.push({ x: e.x, y: e.y, vx: -80, vy: (rand()-0.5)*40, radius: 8 });
+          }
           enemies.splice(i,1);
           score += 50 + Math.floor(world.difficulty * 10);
           break;
@@ -582,6 +615,9 @@ function loop(now) {
   for (const e of enemies) drawEnemy(e.x, e.y, e.type, e.radius);
 
   // Draw bullets
+  // 回復アイテム
+  for (const it of healItems) drawHealItem(it.x, it.y, it.radius);
+
   for (const b of bullets) drawBullet(b.x, b.y, b.radius, '#9bffb0');
   for (const b of enemyBullets) drawBullet(b.x, b.y, b.radius, '#ff9b9b');
 
