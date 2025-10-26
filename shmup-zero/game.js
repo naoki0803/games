@@ -242,6 +242,14 @@ function getSpawnTuningForStage(stage) {
   return { intervalMul: 2.8, extraChance: 0.10 }; // stage 5
 }
 
+// ステージごとの敵射撃クールダウン係数（値が小さいほど高頻度）
+// S4でわずかに短縮、S5でさらに少し短縮
+function getStageFireCooldownMul(stage) {
+  if (stage >= 5) return 0.90; // 10% 速く
+  if (stage >= 4) return 0.95; // 5% 速く
+  return 1.0;
+}
+
 // Spawning
 let enemySpawnTimer = 0;
 function spawnEnemy() {
@@ -268,8 +276,8 @@ function spawnEnemy() {
     vx,
     vy,
     type,
-    // 攻撃頻度を20%低下（クールダウンを1.2倍）
-    fireCooldown: (0.6 + rand()*0.8) * 1.2,
+    // 攻撃頻度を20%低下（クールダウンを1.2倍）しつつ、ステージ係数を適用
+    fireCooldown: ( (0.6 + rand()*0.8) * 1.2 ) * getStageFireCooldownMul(currentStage),
   };
   // waver の上下ランダム変化タイマー
   if (type === 'waver') enemy.vyTimer = 0.5 + rand()*0.8;
@@ -289,7 +297,7 @@ function assignAttackPattern(e) {
   // ステージ1では「1方向にのみ撃つ」シンプルな敵に限定
   if (currentStage === 1) {
     e.pattern = 'fixed_dir'; // 左方向へ固定射撃
-    e.fireCooldown = (0.7 + rand()*0.7) * 1.4;
+    e.fireCooldown = ( (0.7 + rand()*0.7) * 1.4 ) * getStageFireCooldownMul(currentStage);
     return;
   }
 
@@ -297,20 +305,20 @@ function assignAttackPattern(e) {
     // シューターは複数回撃つタイプを優先
     e.pattern = 'multi_times';
     e.shotsRemaining = 3 + Math.floor(rand()*3); // 3-5回
-    e.fireCooldown = (0.5 + rand()*0.5) * 1.4;
+    e.fireCooldown = ( (0.5 + rand()*0.5) * 1.4 ) * getStageFireCooldownMul(currentStage);
     return;
   }
   if (e.type === 'tank') {
     e.pattern = 'volley_once';
     e._attacked = false;
     e.bulletsPerVolley = 5; // 重戦車は多弾
-    e.fireCooldown = (0.8 + rand()*0.6) * 1.4;
+    e.fireCooldown = ( (0.8 + rand()*0.6) * 1.4 ) * getStageFireCooldownMul(currentStage);
     return;
   }
   if (e.type === 'sniper') {
     e.pattern = 'snipe_multi';
     e.shotsRemaining = 3 + Math.floor(rand()*2); // 3-4回
-    e.fireCooldown = (0.9 + rand()*0.6) * 1.4;
+    e.fireCooldown = ( (0.9 + rand()*0.6) * 1.4 ) * getStageFireCooldownMul(currentStage);
     return;
   }
   if (e.type === 'mine') {
@@ -321,28 +329,28 @@ function assignAttackPattern(e) {
   if (e.type === 'charger') {
     e.pattern = 'single_once'; // 突進が主、射撃は控えめ
     e._attacked = false;
-    e.fireCooldown = (0.6 + rand()*0.6) * 1.4;
+    e.fireCooldown = ( (0.6 + rand()*0.6) * 1.4 ) * getStageFireCooldownMul(currentStage);
     return;
   }
   const r = rand();
   if (r < 0.30) {
     e.pattern = 'single_once';
     e._attacked = false;
-    e.fireCooldown = (0.6 + rand()*0.6) * 1.4;
+    e.fireCooldown = ( (0.6 + rand()*0.6) * 1.4 ) * getStageFireCooldownMul(currentStage);
   } else if (r < 0.60) {
     e.pattern = 'multi_times';
     e.shotsRemaining = 2 + Math.floor(rand()*3); // 2-4回
-    e.fireCooldown = (0.6 + rand()*0.6) * 1.4;
+    e.fireCooldown = ( (0.6 + rand()*0.6) * 1.4 ) * getStageFireCooldownMul(currentStage);
   } else if (r < 0.85) {
     e.pattern = 'volley_once';
     e._attacked = false;
     e.bulletsPerVolley = 3 + Math.floor(rand()*2); // 3-4発
-    e.fireCooldown = (0.6 + rand()*0.8) * 1.4;
+    e.fireCooldown = ( (0.6 + rand()*0.8) * 1.4 ) * getStageFireCooldownMul(currentStage);
   } else {
     e.pattern = 'radial_once';
     e._attacked = false;
     e.radialCount = 8; // 8方向
-    e.fireCooldown = (0.7 + rand()*0.7) * 1.4;
+    e.fireCooldown = ( (0.7 + rand()*0.7) * 1.4 ) * getStageFireCooldownMul(currentStage);
   }
 }
 
@@ -363,7 +371,7 @@ function tryEnemyAttack(e) {
     if (!e.shotsRemaining || e.shotsRemaining <= 0) { e.fireCooldown = 9999; return; }
     shootTowards(e.x - 10, e.y, player.x, player.y, baseSpeed);
     e.shotsRemaining--;
-    e.fireCooldown = (0.5 + rand()*0.5) * 1.5; // 次弾までの間隔をさらに延長
+    e.fireCooldown = ( (0.5 + rand()*0.5) * 1.5 ) * getStageFireCooldownMul(currentStage); // 次弾までの間隔をさらに延長
     if (e.shotsRemaining <= 0) e.fireCooldown = 9999;
   } else if (e.pattern === 'volley_once') {
     if (e._attacked) return;
@@ -393,14 +401,14 @@ function tryEnemyAttack(e) {
   } else if (e.pattern === 'fixed_dir') {
     // ステージ1専用: 左方向（プレイヤー非追尾）にのみ射撃を繰り返す
     enemyBullets.push({ x: e.x - 10, y: e.y, vx: -baseSpeed, vy: 0, radius: 4 });
-    e.fireCooldown = (0.6 + rand()*0.8) * 1.5;
+    e.fireCooldown = ( (0.6 + rand()*0.8) * 1.5 ) * getStageFireCooldownMul(currentStage);
   } else if (e.pattern === 'snipe_multi') {
     if (!e.shotsRemaining || e.shotsRemaining <= 0) { e.fireCooldown = 9999; return; }
     // 高速・高精度狙撃
     const snipeSpeed = 260 + rand()*120;
     shootTowards(e.x - 12, e.y, player.x, player.y, snipeSpeed, 3.5);
     e.shotsRemaining--;
-    e.fireCooldown = (0.8 + rand()*0.6) * 1.6;
+    e.fireCooldown = ( (0.8 + rand()*0.6) * 1.6 ) * getStageFireCooldownMul(currentStage);
     if (e.shotsRemaining <= 0) e.fireCooldown = 9999;
   } else if (e.pattern === 'none') {
     // 何もしない
