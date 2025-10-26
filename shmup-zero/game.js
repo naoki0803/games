@@ -3,6 +3,8 @@
 
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
+// 画面スケール（DPR）。描画と判定で必ずこの値を使う
+let renderScale = 1;
 const rotateOverlay = document.getElementById('rotateOverlay');
 
 function isLandscape() {
@@ -18,13 +20,17 @@ function updateOrientationNotice() {
 
 // Layout / DPR
 function resizeCanvas() {
-  const dpr = Math.max(1, Math.min(2, window.devicePixelRatio || 1));
+  // 使用するDPRを決定（高すぎるとコストが重いので上限2）
+  renderScale = Math.max(1, Math.min(2, window.devicePixelRatio || 1));
   const width = canvas.clientWidth || window.innerWidth;
   const height = canvas.clientHeight || window.innerHeight;
-  canvas.width = Math.floor(width * dpr);
-  canvas.height = Math.floor(height * dpr);
-  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  canvas.width = Math.floor(width * renderScale);
+  canvas.height = Math.floor(height * renderScale);
+  // CSSピクセル単位で描けるようにキャンバスの座標系をスケール
+  ctx.setTransform(renderScale, 0, 0, renderScale, 0, 0);
   updateOrientationNotice();
+  // 画面サイズが変わったら背景の星分布も張り直す
+  scatterStars();
 }
 window.addEventListener('resize', resizeCanvas);
 window.addEventListener('orientationchange', () => { setTimeout(resizeCanvas, 50); });
@@ -100,9 +106,8 @@ function circleOverlap(ax, ay, ar, bx, by, br) {
 const stars = new Array(120).fill(0).map(() => ({ x: 0, y: 0, z: 0 }));
 
 function scatterStars() {
-  const dpr = window.devicePixelRatio || 1;
-  const w = (canvas.width || window.innerWidth) / dpr;
-  const h = (canvas.height || window.innerHeight) / dpr;
+  const w = (canvas.width || window.innerWidth) / renderScale;
+  const h = (canvas.height || window.innerHeight) / renderScale;
   for (let i = 0; i < stars.length; i++) {
     stars[i].x = rand() * w;
     stars[i].y = rand() * h;
@@ -114,9 +119,8 @@ scatterStars();
 
 function drawStars(dt) {
   ctx.save();
-  const dpr = window.devicePixelRatio || 1;
-  const w = canvas.width / dpr;
-  const h = canvas.height / dpr;
+  const w = canvas.width / renderScale;
+  const h = canvas.height / renderScale;
   for (const s of stars) {
     s.x -= (world.speed * 0.3 * s.z) * dt;
     if (s.x < -2) {
@@ -139,9 +143,8 @@ highScoreEl.textContent = highScore.toString();
 // Spawning
 let enemySpawnTimer = 0;
 function spawnEnemy() {
-  const dpr = window.devicePixelRatio || 1;
-  const w = canvas.width / dpr;
-  const h = canvas.height / dpr;
+  const w = canvas.width / renderScale;
+  const h = canvas.height / renderScale;
   const y = 40 + rand() * (h - 80);
   const type = rand() < 0.75 ? 'grunt' : 'shooter';
   const radius = type === 'grunt' ? 16 : 18;
@@ -237,7 +240,7 @@ function togglePause() {
 function resetGame() {
   score = 0;
   world.scrollX = 0; world.time = 0; world.difficulty = 1;
-  player.x = 100; player.y = canvas.height/(window.devicePixelRatio||1)/2; player.hp = player.maxHp; player.fireCooldown = 0; player.alive = true; player.invul = 1.2;
+  player.x = 100; player.y = canvas.height / renderScale / 2; player.hp = player.maxHp; player.fireCooldown = 0; player.alive = true; player.invul = 1.2;
   bullets.length = 0; enemies.length = 0; enemyBullets.length = 0; particles.length = 0;
   enemySpawnTimer = 0;
   overlayEl.classList.add('hidden');
@@ -320,8 +323,8 @@ function loop(now) {
     player.x += mvx * player.speed * dt;
     player.y += mvy * player.speed * dt;
   }
-  const w = canvas.width / (window.devicePixelRatio || 1);
-  const h = canvas.height / (window.devicePixelRatio || 1);
+  const w = canvas.width / renderScale;
+  const h = canvas.height / renderScale;
   player.x = clamp(player.x, 16, w - 16);
   player.y = clamp(player.y, 16, h - 16);
 
