@@ -34,7 +34,6 @@ function resizeCanvas() {
 }
 window.addEventListener('resize', resizeCanvas);
 window.addEventListener('orientationchange', () => { setTimeout(resizeCanvas, 50); });
-resizeCanvas();
 
 // UI elements
 const overlayEl = document.getElementById('overlay');
@@ -134,6 +133,10 @@ function drawStars(dt) {
   }
   ctx.restore();
 }
+
+// 初期化タイミング調整：星の配列初期化後にキャンバスサイズを確定
+//（resizeCanvas 内で scatterStars を呼ぶため、ここで呼び出すのが安全）
+resizeCanvas();
 
 // Score
 let score = 0;
