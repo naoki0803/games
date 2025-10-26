@@ -162,18 +162,24 @@ h1 {
 /* 仮想コントローラー */
 .virtual-controls {
     display: none;
-    margin-top: 20px;
-    gap: 15px;
-    flex-direction: column;
-    align-items: center;
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 1000;
 }
 
 .controls-row {
+    position: absolute;
+    right: 0;
+    bottom: 0;
+    left: 0;
     display: flex;
     gap: 20px;
-    justify-content: center;
-    align-items: center;
+    justify-content: flex-end;
+    align-items: flex-end;
+    padding: 16px;
     width: 100%;
+    pointer-events: none;
 }
 
 .move-buttons {
@@ -286,6 +292,7 @@ h1 {
     display: inline-block;
     min-width: 200px;
     min-height: 70px;
+    pointer-events: auto;
 }
 
 .toggle-btn-wrapper .control-btn {
@@ -300,11 +307,15 @@ h1 {
     background: linear-gradient(135deg, rgba(255, 100, 0, 0.2), rgba(255, 50, 0, 0.3));
     border-color: #ff6400;
     color: #ff6400;
-    padding: 20px 50px;
-    font-size: 1.8em;
+    padding: 16px 28px;
+    font-size: 1.2em;
     box-shadow: 0 0 15px rgba(255, 100, 0, 0.3),
                 inset 0 0 10px rgba(255, 100, 0, 0.1);
-    position: relative;
+    position: fixed;
+    right: max(12px, env(safe-area-inset-right));
+    bottom: max(12px, env(safe-area-inset-bottom));
+    border-radius: 16px;
+    pointer-events: auto;
 }
 
 .fire-btn:active {
@@ -397,19 +408,13 @@ h1 {
     }
     
     .virtual-controls {
-        display: flex;
-        margin-top: 15px;
-        margin-bottom: 20px;
-        padding-bottom: max(20px, env(safe-area-inset-bottom));
-        padding-left: 10px;
-        padding-right: 10px;
-        position: sticky;
-        bottom: 0;
+        display: block;
     }
     
     .controls-row {
-        gap: 15px;
-        justify-content: center;
+        gap: 12px;
+        padding: 12px;
+        justify-content: flex-end;
     }
     
     .move-buttons {
@@ -446,13 +451,14 @@ h1 {
     }
     
     .fire-btn {
-        padding: 15px 35px;
-        font-size: 1.4em;
+        padding: 14px 22px;
+        font-size: 1.1em;
     }
     
     .start-btn {
-        padding: 15px 35px;
-        font-size: 1.4em;
+        padding: 12px 18px;
+        font-size: 1.1em;
+        pointer-events: auto;
     }
     
     .desktop-controls {
@@ -505,14 +511,9 @@ h1 {
         font-size: 0.8em;
     }
     
-    .virtual-controls {
-        margin-top: 8px;
-        gap: 8px;
-    }
+    .virtual-controls { }
     
-    .controls-row {
-        gap: 10px;
-    }
+    .controls-row { gap: 10px; }
     
     .move-btn {
         width: 60px;
@@ -535,13 +536,7 @@ h1 {
         bottom: -20px;
     }
     
-    .fire-btn {
-        padding: 10px 30px;
-        font-size: 1.2em;
-    }
+    .fire-btn { padding: 12px 18px; font-size: 1em; }
     
-    .start-btn {
-        padding: 10px 30px;
-        font-size: 1.2em;
-    }
+    .start-btn { padding: 10px 16px; font-size: 1em; }
 }

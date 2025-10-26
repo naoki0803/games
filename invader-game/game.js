@@ -22,32 +22,14 @@ function setCanvasSize() {
     if (!canvas) return;
     const isMobile = window.innerWidth <= 768;
     if (isMobile) {
-        // モバイル: 実測UI高さからキャンバス高さを算出（見切れ防止）
+        // モバイル: キャンバスは画面を最大限使用（オーバーレイUIは高さから除外）
         const viewportHeight = window.visualViewport ? window.visualViewport.height : window.innerHeight;
-
-        // 実際のレイアウト要素の高さを測定
-        const headerEl = document.querySelector('.header');
-        const controlsRowEl = document.querySelector('.controls-row');
-        const headerHeight = headerEl ? headerEl.getBoundingClientRect().height : 0;
-        const controlsRowVisible = controlsRowEl && getComputedStyle(controlsRowEl).display !== 'none';
-        const controlsHeight = controlsRowVisible ? controlsRowEl.getBoundingClientRect().height : 0;
-
-        // セーフエリアや余白分の安全マージン
-        let safePadding = 32;
-        try {
-            const bodyStyles = getComputedStyle(document.body);
-            const pb = parseInt(bodyStyles.paddingBottom || '0', 10);
-            if (!Number.isNaN(pb)) safePadding = Math.max(safePadding, pb + 12);
-        } catch (_) {
-            // 取得できない環境では既定値を使用
-        }
 
         // 横幅は従来通り
         canvas.width = Math.min(window.innerWidth - 20, 400);
 
-        // 利用可能高さから各UIの高さを引いて算出
-        const availableHeight = viewportHeight - headerHeight - controlsHeight - safePadding;
-        const targetHeight = Math.max(260, Math.min(availableHeight, 600));
+        // 余白を最小化して高さを確保（下部の固定ボタンはオーバーレイ）
+        const targetHeight = Math.max(320, Math.min(viewportHeight - 8, 640));
         canvas.height = Math.floor(targetHeight);
     } else {
         // PC: 従来のサイズ
