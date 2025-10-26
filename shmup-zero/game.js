@@ -485,7 +485,8 @@ function loop(now) {
     if (rand() < 0.25) spawnEnemy();
     // ベース間隔を短縮（時間経過で最短 ~0.3s 程度）
     const base = 0.7 - Math.min(0.4, world.time * 0.02);
-    enemySpawnTimer = base * (0.9 + rand()*0.3);
+    // 出現頻度を20%低下させるため、待ち時間を1.25倍
+    enemySpawnTimer = base * (0.9 + rand()*0.3) * 1.25;
   }
 
   // Update enemies（移動 + 攻撃）
