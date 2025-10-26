@@ -90,6 +90,10 @@ const player = {
   // シールド（被弾/接触無効化チャージ）
   shieldCharges: 0,
   maxShieldCharges: 5,
+  // 武器強化レベル（パワーアイテムで増える）: 0=1本, 1=2本...
+  shotPowerLevel: 0,
+  // 子機アイテムの3個目以降で増える追加ショットレベル
+  extraShotLevelsFromCompanion: 0,
 };
 
 // 自動射撃フラグ（true で常に自動射撃）
@@ -104,6 +108,7 @@ const healItems = []; // {x,y,vx,vy,radius}
 const shieldItems = []; // {x,y,vx,vy,radius}
 const companionItems = []; // {x,y,vx,vy,radius}
 const companions = []; // {offsetY, fireCooldown}
+const powerItems = []; // {x,y,vx,vy,radius}
 
 // Companions (子機)
 const MAX_COMPANIONS = 2;
@@ -119,6 +124,22 @@ let input = {
 function clamp(v, a, b) { return Math.max(a, Math.min(b, v)); }
 function circleOverlap(ax, ay, ar, bx, by, br) {
   const dx = ax - bx, dy = ay - by; return dx*dx + dy*dy <= (ar+br)*(ar+br);
+}
+
+// 現在の総ショット本数（1〜5）
+const MAX_SHOT_LINES = 5;
+function getTotalShotLines() {
+  return clamp(1 + (player.shotPowerLevel || 0) + (player.extraShotLevelsFromCompanion || 0), 1, MAX_SHOT_LINES);
+}
+
+// 平行弾を発射（上下に等間隔オフセット）
+function fireParallelShots(ox, oy, vx, from, radius = 4, separation = 10) {
+  const lines = getTotalShotLines();
+  const mid = (lines - 1) / 2;
+  for (let i = 0; i < lines; i++) {
+    const offset = (i - mid) * separation;
+    bullets.push({ x: ox, y: oy + offset, vx, vy: 0, radius, from });
+  }
 }
 
 // Background stars
@@ -162,14 +183,16 @@ resizeCanvas();
 let score = 0;
 let highScore = Number(localStorage.getItem('shmupZeroHighScore') || 0);
 highScoreEl.textContent = highScore.toString();
-// スコアに応じたステージ閾値（1-indexed: [S1開始, S2開始, S3開始]）
-// ステージを5000ポイント毎に進行: S1=0, S2=5000, S3=10000
-const STAGE_SCORE_THRESHOLDS = [0, 5000, 10000];
+// スコアに応じたステージ閾値（1-indexed: [S1開始, S2開始, S3開始, S4開始, S5開始]）
+// 5000点刻みで進行: S1=0, S2=5000, S3=10000, S4=15000, S5=20000
+const STAGE_SCORE_THRESHOLDS = [0, 5000, 10000, 15000, 20000];
 let currentStage = 1;
 let pendingStage = 1;
 let stageTransitionPending = false;
 
 function getStageForScore(sc) {
+  if (sc >= STAGE_SCORE_THRESHOLDS[4]) return 5;
+  if (sc >= STAGE_SCORE_THRESHOLDS[3]) return 4;
   if (sc >= STAGE_SCORE_THRESHOLDS[2]) return 3;
   if (sc >= STAGE_SCORE_THRESHOLDS[1]) return 2;
   return 1;
@@ -178,25 +201,45 @@ function getStageForScore(sc) {
 function pickEnemyTypeForStage(stage) {
   if (stage === 1) return 'grunt';
   if (stage === 2) return (rand() < 0.65) ? 'grunt' : 'shooter';
-  // stage 3: 全種類
+  if (stage === 3) {
+    const t = rand();
+    return t < 0.50 ? 'grunt' : (t < 0.80 ? 'shooter' : 'waver');
+  }
+  if (stage === 4) {
+    const t = rand();
+    // grunt, shooter, waver, charger, tank
+    if (t < 0.35) return 'grunt';
+    if (t < 0.60) return 'shooter';
+    if (t < 0.78) return 'waver';
+    if (t < 0.90) return 'charger';
+    return 'tank';
+  }
+  // stage 5: 全種類 + 地雷/狙撃
   const t = rand();
-  return t < 0.5 ? 'grunt' : (t < 0.8 ? 'shooter' : 'waver');
+  if (t < 0.28) return 'grunt';
+  if (t < 0.50) return 'shooter';
+  if (t < 0.66) return 'waver';
+  if (t < 0.78) return 'charger';
+  if (t < 0.90) return 'tank';
+  return (rand() < 0.5) ? 'mine' : 'sniper';
 }
 
 // ステージごとの同時出現上限（種類が増えても総数が暴れないよう制限）
 function getMaxEnemiesForStage(stage) {
   if (stage === 1) return 8;
   if (stage === 2) return 6;
-  // stage 3
-  return 6;
+  if (stage === 3) return 6;
+  if (stage === 4) return 7;
+  return 7; // stage 5
 }
 
 // ステージごとの出現間隔と同時出現確率の調整
 function getSpawnTuningForStage(stage) {
   if (stage === 1) return { intervalMul: 1.5, extraChance: 0.25 };
   if (stage === 2) return { intervalMul: 2.1, extraChance: 0.12 };
-  // stage 3
-  return { intervalMul: 2.4, extraChance: 0.08 };
+  if (stage === 3) return { intervalMul: 2.4, extraChance: 0.08 };
+  if (stage === 4) return { intervalMul: 2.6, extraChance: 0.09 };
+  return { intervalMul: 2.8, extraChance: 0.10 }; // stage 5
 }
 
 // Spawning
@@ -207,22 +250,30 @@ function spawnEnemy() {
   const y = 40 + rand() * (h - 80);
   // 敵タイプ: grunt(標準), shooter(射撃特化), waver(上下にランダム移動)
   const type = pickEnemyTypeForStage(currentStage);
-  // 一回り小さく
-  const radius = type === 'grunt' ? 12 : 14;
+  let radius = 14;
+  let hp = 3;
+  let vx = - (world.speed * (1.0 + world.difficulty*0.05)) * (0.9 + rand()*0.4) * 0.8;
+  let vy = (rand()-0.5) * 40 * 0.8;
+  if (type === 'grunt') { radius = 12; hp = 1; }
+  if (type === 'waver') { vy = (rand()-0.5) * 80 * 0.8; }
+  if (type === 'charger') { radius = 12; hp = 2; vx *= 1.2; vy = (rand()-0.5) * 30; }
+  if (type === 'tank') { radius = 18; hp = 8; vx *= 0.6; vy = (rand()-0.5) * 25; }
+  if (type === 'mine') { radius = 10; hp = 1; vx *= 0.5; vy = (rand()-0.5) * 20; }
+  if (type === 'sniper') { radius = 12; hp = 3; vx *= 0.9; vy = (rand()-0.5) * 20; }
   const enemy = {
     x: w + 40,
     y,
     radius,
-    hp: type === 'grunt' ? 1 : 3,
-    // 敵の移動速度を20%低下
-    vx: - (world.speed * (1.0 + world.difficulty*0.05)) * (0.9 + rand()*0.4) * 0.8,
-    vy: (type === 'waver') ? (rand()-0.5) * 80 * 0.8 : (rand()-0.5) * 40 * 0.8,
+    hp,
+    vx,
+    vy,
     type,
     // 攻撃頻度を20%低下（クールダウンを1.2倍）
     fireCooldown: (0.6 + rand()*0.8) * 1.2,
   };
   // waver の上下ランダム変化タイマー
   if (type === 'waver') enemy.vyTimer = 0.5 + rand()*0.8;
+  if (type === 'charger') { enemy.baseVx = vx; enemy.dashTimer = 0; enemy.dashCooldown = 0.8 + rand()*0.8; }
 
   // すべての敵に攻撃パターンを付与（何もしない敵を排除）
   assignAttackPattern(enemy);
@@ -247,6 +298,30 @@ function assignAttackPattern(e) {
     e.pattern = 'multi_times';
     e.shotsRemaining = 3 + Math.floor(rand()*3); // 3-5回
     e.fireCooldown = (0.5 + rand()*0.5) * 1.4;
+    return;
+  }
+  if (e.type === 'tank') {
+    e.pattern = 'volley_once';
+    e._attacked = false;
+    e.bulletsPerVolley = 5; // 重戦車は多弾
+    e.fireCooldown = (0.8 + rand()*0.6) * 1.4;
+    return;
+  }
+  if (e.type === 'sniper') {
+    e.pattern = 'snipe_multi';
+    e.shotsRemaining = 3 + Math.floor(rand()*2); // 3-4回
+    e.fireCooldown = (0.9 + rand()*0.6) * 1.4;
+    return;
+  }
+  if (e.type === 'mine') {
+    e.pattern = 'none'; // 射撃しない（破壊/接触で危険）
+    e.fireCooldown = 9999;
+    return;
+  }
+  if (e.type === 'charger') {
+    e.pattern = 'single_once'; // 突進が主、射撃は控えめ
+    e._attacked = false;
+    e.fireCooldown = (0.6 + rand()*0.6) * 1.4;
     return;
   }
   const r = rand();
@@ -319,6 +394,16 @@ function tryEnemyAttack(e) {
     // ステージ1専用: 左方向（プレイヤー非追尾）にのみ射撃を繰り返す
     enemyBullets.push({ x: e.x - 10, y: e.y, vx: -baseSpeed, vy: 0, radius: 4 });
     e.fireCooldown = (0.6 + rand()*0.8) * 1.5;
+  } else if (e.pattern === 'snipe_multi') {
+    if (!e.shotsRemaining || e.shotsRemaining <= 0) { e.fireCooldown = 9999; return; }
+    // 高速・高精度狙撃
+    const snipeSpeed = 260 + rand()*120;
+    shootTowards(e.x - 12, e.y, player.x, player.y, snipeSpeed, 3.5);
+    e.shotsRemaining--;
+    e.fireCooldown = (0.8 + rand()*0.6) * 1.6;
+    if (e.shotsRemaining <= 0) e.fireCooldown = 9999;
+  } else if (e.pattern === 'none') {
+    // 何もしない
   }
 }
 
@@ -404,7 +489,9 @@ function resetGame() {
   world.scrollX = 0; world.time = 0; world.difficulty = 1;
   player.x = 100; player.y = canvas.height / renderScale / 2; player.hp = player.maxHp; player.fireCooldown = 0; player.alive = true; player.invul = 1.2;
   player.shieldCharges = 0;
-  bullets.length = 0; enemies.length = 0; enemyBullets.length = 0; particles.length = 0; healItems.length = 0; shieldItems.length = 0; companionItems.length = 0; companions.length = 0;
+  player.shotPowerLevel = 0;
+  player.extraShotLevelsFromCompanion = 0;
+  bullets.length = 0; enemies.length = 0; enemyBullets.length = 0; particles.length = 0; healItems.length = 0; shieldItems.length = 0; companionItems.length = 0; powerItems.length = 0; companions.length = 0;
   enemySpawnTimer = 0;
   // ステージ状態を初期化
   currentStage = 1; pendingStage = 1; stageTransitionPending = false;
@@ -447,10 +534,42 @@ function drawEnemy(x, y, type, r) {
   } else if (type === 'shooter') {
     ctx.fillStyle = '#ffb86b';
     ctx.beginPath(); ctx.moveTo(-r, -r); ctx.lineTo(r*0.4, 0); ctx.lineTo(-r, r); ctx.closePath(); ctx.fill();
-  } else { // waver
+  } else if (type === 'waver') {
     ctx.fillStyle = '#ffa3d1';
     ctx.beginPath(); ctx.arc(0,0,r,0,Math.PI*2); ctx.fill();
     ctx.fillStyle = 'white'; ctx.fillRect(-r*0.6,-r*0.15,r*1.2,r*0.3);
+  } else if (type === 'charger') {
+    ctx.fillStyle = '#ffd54a';
+    ctx.beginPath();
+    ctx.moveTo(-r*0.8, -r*0.6);
+    ctx.lineTo(r*0.9, 0);
+    ctx.lineTo(-r*0.8, r*0.6);
+    ctx.closePath();
+    ctx.fill();
+  } else if (type === 'tank') {
+    ctx.fillStyle = '#8ecae6';
+    ctx.fillRect(-r, -r*0.7, r*2, r*1.4);
+    ctx.fillStyle = '#023047';
+    ctx.fillRect(-r*0.6, -r*0.25, r*1.2, r*0.5);
+  } else if (type === 'mine') {
+    ctx.fillStyle = '#c2c2c2';
+    ctx.beginPath(); ctx.arc(0,0,r,0,Math.PI*2); ctx.fill();
+    ctx.strokeStyle = '#666'; ctx.lineWidth = 2;
+    for (let i = 0; i < 6; i++) {
+      const a = (Math.PI*2) * (i/6);
+      ctx.beginPath();
+      ctx.moveTo(Math.cos(a)*r*0.4, Math.sin(a)*r*0.4);
+      ctx.lineTo(Math.cos(a)*r*0.9, Math.sin(a)*r*0.9);
+      ctx.stroke();
+    }
+  } else if (type === 'sniper') {
+    ctx.fillStyle = '#ff8fab';
+    ctx.beginPath();
+    ctx.moveTo(-r, 0);
+    ctx.lineTo(r*0.8, -r*0.5);
+    ctx.lineTo(r*0.8, r*0.5);
+    ctx.closePath();
+    ctx.fill();
   }
   ctx.restore();
 }
@@ -497,6 +616,20 @@ function drawCompanionItem(x, y, r) {
   ctx.fillStyle = '#ffffff';
   ctx.fillRect(-r * 0.5, -1.5, r, 3); // 横バー
   ctx.fillRect(-1.5, -r * 0.5, 3, r); // 縦バー
+  ctx.restore();
+}
+
+function drawPowerItem(x, y, r) {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.fillStyle = '#ffd166';
+  ctx.beginPath();
+  ctx.arc(0, 0, r, 0, Math.PI * 2);
+  ctx.fill();
+  // 中央に二本線アイコン
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(-r * 0.45, -r * 0.55, r * 0.22, r * 1.1);
+  ctx.fillRect(r * 0.23, -r * 0.55, r * 0.22, r * 1.1);
   ctx.restore();
 }
 
@@ -556,8 +689,8 @@ function loop(now) {
   player.fireCooldown -= dt;
   if ((AUTO_FIRE || input.shoot) && player.fireCooldown <= 0) {
     player.fireCooldown = player.fireRate;
-    // 一度に出る弾数を減らし、常に1発に統一
-    bullets.push({ x: player.x + 14, y: player.y, vx: 520, vy: 0, radius: 4, from: 'player' });
+    // 多重ショット（プレイヤー）
+    fireParallelShots(player.x + 14, player.y, 520, 'player', 4);
   }
 
   // Companion follow + shooting
@@ -569,7 +702,8 @@ function loop(now) {
     c.fireCooldown = (c.fireCooldown || 0) - dt;
     if ((AUTO_FIRE || input.shoot) && c.fireCooldown <= 0) {
       c.fireCooldown = COMPANION_FIRE_RATE;
-      bullets.push({ x: cx + 10, y: cy, vx: 480, vy: 0, radius: 3.5, from: 'companion' });
+      // 多重ショット（子機も同本数）
+      fireParallelShots(cx + 10, cy, 480, 'companion', 3.5, 9);
     }
   }
 
@@ -601,6 +735,20 @@ function loop(now) {
       if (e.vyTimer <= 0) { e.vy = (rand()-0.5) * 140 * 0.8; e.vyTimer = 0.5 + rand()*0.8; }
       // 端で反転
       if ((e.y < 30 && e.vy < 0) || (e.y > h - 30 && e.vy > 0)) e.vy = -e.vy;
+    }
+    // charger は周期的にダッシュ
+    if (e.type === 'charger') {
+      e.dashTimer = (e.dashTimer || 0) - dt;
+      e.dashCooldown = (e.dashCooldown || 0) - dt;
+      if (e.dashCooldown <= 0 && e.dashTimer <= 0) {
+        e.dashTimer = 0.35;
+        e.dashCooldown = 1.2 + rand()*0.8;
+        e.vx = -Math.abs(world.speed * (2.1 + rand()*0.6));
+        e.vy = (rand()-0.5) * 40;
+      }
+      if (e.dashTimer <= 0 && e.baseVx !== undefined) {
+        e.vx = e.baseVx;
+      }
     }
     // 全ての敵が攻撃
     e.fireCooldown -= dt;
@@ -659,9 +807,27 @@ function loop(now) {
         const idx = companions.length; // 0 or 1
         const offsetY = idx === 0 ? -COMPANION_OFFSET_Y : COMPANION_OFFSET_Y;
         companions.push({ offsetY, fireCooldown: 0 });
-        addExplosion(it.x, it.y, '#d1b3ff', 12);
+      } else {
+        // 3個目以降は攻撃本数を増加
+        player.extraShotLevelsFromCompanion = clamp((player.extraShotLevelsFromCompanion || 0) + 1, 0, MAX_SHOT_LINES - 1);
       }
+      addExplosion(it.x, it.y, '#d1b3ff', 12);
       companionItems.splice(i,1);
+      continue;
+    }
+  }
+
+  // パワーアイテムの更新・取得判定
+  for (let i = powerItems.length - 1; i >= 0; i--) {
+    const it = powerItems[i];
+    it.x += it.vx * dt; it.y += it.vy * dt;
+    it.vy += 30 * dt;
+    if (it.x < -20 || it.y < -20 || it.y > h + 20) { powerItems.splice(i,1); continue; }
+    if (player.alive && circleOverlap(player.x, player.y, player.radius, it.x, it.y, it.radius)) {
+      // 攻撃本数を強化（最大5本）
+      player.shotPowerLevel = clamp((player.shotPowerLevel || 0) + 1, 0, MAX_SHOT_LINES - 1);
+      addExplosion(it.x, it.y, '#ffd166', 14);
+      powerItems.splice(i,1);
       continue;
     }
   }
@@ -684,8 +850,10 @@ function loop(now) {
             healItems.push({ x: e.x, y: e.y, vx: -80, vy: (rand()-0.5)*40, radius: 8 });
           } else if (dropRoll < 0.08) {
             shieldItems.push({ x: e.x, y: e.y, vx: -80, vy: (rand()-0.5)*40, radius: 10 });
-      } else if (dropRoll < 0.11) { // 子機アイテムの確率は他と同じ3%幅
+          } else if (dropRoll < 0.11) { // 子機アイテムの確率は他と同じ3%幅
             companionItems.push({ x: e.x, y: e.y, vx: -80, vy: (rand()-0.5)*40, radius: 9 });
+          } else if (dropRoll < 0.14) {
+            powerItems.push({ x: e.x, y: e.y, vx: -80, vy: (rand()-0.5)*40, radius: 9 });
           }
           enemies.splice(i,1);
           score += 50 + Math.floor(world.difficulty * 10);
@@ -775,6 +943,8 @@ function loop(now) {
   for (const it of shieldItems) drawShieldItem(it.x, it.y, it.radius);
   // 子機アイテム
   for (const it of companionItems) drawCompanionItem(it.x, it.y, it.radius);
+  // パワーアイテム
+  for (const it of powerItems) drawPowerItem(it.x, it.y, it.radius);
 
   for (const b of bullets) drawBullet(b.x, b.y, b.radius, '#9bffb0');
   for (const b of enemyBullets) drawBullet(b.x, b.y, b.radius, '#ff9b9b');
