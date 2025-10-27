@@ -138,7 +138,7 @@ function fireParallelShots(ox, oy, vx, from, radius = 4, separation = 10) {
   const mid = (lines - 1) / 2;
   for (let i = 0; i < lines; i++) {
     const offset = (i - mid) * separation;
-    bullets.push({ x: ox, y: oy + offset, vx, vy: 0, radius, from });
+    bullets.push({ x: ox, y: oy + offset, prevX: ox, prevY: oy + offset, vx, vy: 0, radius, from });
   }
 }
 
@@ -357,7 +357,7 @@ function assignAttackPattern(e) {
 function shootTowards(x, y, tx, ty, speed, radius = 4) {
   const dx = tx - x; const dy = ty - y; const len = Math.hypot(dx, dy) || 1;
   const sp = speed;
-  enemyBullets.push({ x, y, vx: dx/len*sp, vy: dy/len*sp, radius });
+  enemyBullets.push({ x, y, prevX: x, prevY: y, vx: dx/len*sp, vy: dy/len*sp, radius });
 }
 
 function tryEnemyAttack(e) {
@@ -383,7 +383,7 @@ function tryEnemyAttack(e) {
       const ang = baseAngle + t * totalSpread;
       const vx = Math.cos(ang) * baseSpeed;
       const vy = Math.sin(ang) * baseSpeed;
-      enemyBullets.push({ x: e.x - 10, y: e.y, vx, vy, radius: 4 });
+      enemyBullets.push({ x: e.x - 10, y: e.y, prevX: e.x - 10, prevY: e.y, vx, vy, radius: 4 });
     }
     e._attacked = true;
     e.fireCooldown = 9999;
@@ -394,13 +394,13 @@ function tryEnemyAttack(e) {
       const ang = (Math.PI * 2) * (k / n);
       const vx = Math.cos(ang) * (150 + rand()*70);
       const vy = Math.sin(ang) * (150 + rand()*70);
-      enemyBullets.push({ x: e.x, y: e.y, vx, vy, radius: 4 });
+      enemyBullets.push({ x: e.x, y: e.y, prevX: e.x, prevY: e.y, vx, vy, radius: 4 });
     }
     e._attacked = true;
     e.fireCooldown = 9999;
   } else if (e.pattern === 'fixed_dir') {
     // ステージ1専用: 左方向（プレイヤー非追尾）にのみ射撃を繰り返す
-    enemyBullets.push({ x: e.x - 10, y: e.y, vx: -baseSpeed, vy: 0, radius: 4 });
+    enemyBullets.push({ x: e.x - 10, y: e.y, prevX: e.x - 10, prevY: e.y, vx: -baseSpeed, vy: 0, radius: 4 });
     e.fireCooldown = ( (0.6 + rand()*0.8) * 1.5 ) * getStageFireCooldownMul(currentStage);
   } else if (e.pattern === 'snipe_multi') {
     if (!e.shotsRemaining || e.shotsRemaining <= 0) { e.fireCooldown = 9999; return; }
@@ -521,61 +521,154 @@ function startGame() {
 function drawShip(x, y, color, r = 16) {
   ctx.save();
   ctx.translate(x, y);
-  ctx.fillStyle = color;
+  // 本体: ネオングラデ + 外周グロー
+  const bodyGrad = ctx.createLinearGradient(-r, -r, r, r);
+  bodyGrad.addColorStop(0, '#0b1f33');
+  bodyGrad.addColorStop(0.5, color);
+  bodyGrad.addColorStop(1, '#0b1f33');
+  ctx.shadowColor = color;
+  ctx.shadowBlur = 18;
+  ctx.fillStyle = bodyGrad;
   ctx.beginPath();
-  ctx.moveTo(-r*0.6, -r*0.6);
-  ctx.lineTo(r, 0);
-  ctx.lineTo(-r*0.6, r*0.6);
+  // 先端を鋭く、テールを絞るデルタ翼
+  ctx.moveTo(r, 0);
+  ctx.lineTo(-r * 0.6, -r * 0.72);
+  ctx.lineTo(-r * 0.25, -r * 0.18);
+  ctx.lineTo(-r * 0.7, 0);
+  ctx.lineTo(-r * 0.25, r * 0.18);
+  ctx.lineTo(-r * 0.6, r * 0.72);
   ctx.closePath();
   ctx.fill();
-  ctx.fillStyle = 'rgba(255,255,255,0.9)';
-  ctx.fillRect(-r*0.2, -2, r*0.6, 4);
+  // キャノピー
+  ctx.shadowBlur = 8;
+  const canopyGrad = ctx.createLinearGradient(-r * 0.15, -r * 0.25, r * 0.3, r * 0.25);
+  canopyGrad.addColorStop(0, 'rgba(255,255,255,0.85)');
+  canopyGrad.addColorStop(1, 'rgba(120,200,255,0.15)');
+  ctx.fillStyle = canopyGrad;
+  ctx.beginPath();
+  ctx.ellipse(r * 0.1, 0, r * 0.35, r * 0.22, 0, 0, Math.PI * 2);
+  ctx.fill();
+  // アウトライン
+  ctx.shadowBlur = 0;
+  ctx.strokeStyle = 'rgba(255,255,255,0.25)';
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.moveTo(r, 0);
+  ctx.lineTo(-r * 0.6, -r * 0.72);
+  ctx.lineTo(-r * 0.25, -r * 0.18);
+  ctx.lineTo(-r * 0.7, 0);
+  ctx.lineTo(-r * 0.25, r * 0.18);
+  ctx.lineTo(-r * 0.6, r * 0.72);
+  ctx.closePath();
+  ctx.stroke();
+  // エンジン噴射のコア
+  const flameLen = r * (0.9 + Math.sin(world.time * 40) * 0.07);
+  const flameGrad = ctx.createLinearGradient(-r * 0.8, 0, -r * 0.8 - flameLen, 0);
+  flameGrad.addColorStop(0, 'rgba(120,220,255,0.95)');
+  flameGrad.addColorStop(1, 'rgba(0,150,255,0)');
+  ctx.shadowColor = color;
+  ctx.shadowBlur = 14;
+  ctx.fillStyle = flameGrad;
+  ctx.beginPath();
+  ctx.moveTo(-r * 0.7, 0);
+  ctx.lineTo(-r * 0.8 - flameLen, -r * 0.18);
+  ctx.lineTo(-r * 0.8 - flameLen, r * 0.18);
+  ctx.closePath();
+  ctx.fill();
   ctx.restore();
 }
 
 function drawEnemy(x, y, type, r) {
-  ctx.save(); ctx.translate(x, y);
-  if (type === 'grunt') {
-    ctx.fillStyle = '#ff6b6b';
-    ctx.beginPath(); ctx.arc(0,0,r,0,Math.PI*2); ctx.fill();
-    ctx.fillStyle = 'white'; ctx.fillRect(-r*0.5,-2,r,4);
-  } else if (type === 'shooter') {
-    ctx.fillStyle = '#ffb86b';
-    ctx.beginPath(); ctx.moveTo(-r, -r); ctx.lineTo(r*0.4, 0); ctx.lineTo(-r, r); ctx.closePath(); ctx.fill();
-  } else if (type === 'waver') {
-    ctx.fillStyle = '#ffa3d1';
-    ctx.beginPath(); ctx.arc(0,0,r,0,Math.PI*2); ctx.fill();
-    ctx.fillStyle = 'white'; ctx.fillRect(-r*0.6,-r*0.15,r*1.2,r*0.3);
-  } else if (type === 'charger') {
-    ctx.fillStyle = '#ffd54a';
+  ctx.save();
+  ctx.translate(x, y);
+  const drawNeonCircle = (radius, inner, outer, glow, line) => {
+    const grad = ctx.createRadialGradient(0, 0, radius * 0.1, 0, 0, radius);
+    grad.addColorStop(0, inner);
+    grad.addColorStop(1, outer);
+    ctx.shadowColor = glow;
+    ctx.shadowBlur = radius * 0.9;
+    ctx.fillStyle = grad;
     ctx.beginPath();
-    ctx.moveTo(-r*0.8, -r*0.6);
-    ctx.lineTo(r*0.9, 0);
-    ctx.lineTo(-r*0.8, r*0.6);
+    ctx.arc(0, 0, radius, 0, Math.PI * 2);
+    ctx.fill();
+    if (line) {
+      ctx.shadowBlur = 0;
+      ctx.strokeStyle = line;
+      ctx.lineWidth = 2;
+      ctx.stroke();
+    }
+  };
+  if (type === 'grunt') {
+    drawNeonCircle(r, '#ff9aa8', '#831f2b', 'rgba(255,107,107,0.9)', 'rgba(255,255,255,0.25)');
+    // コアライン
+    ctx.fillStyle = 'rgba(255,255,255,0.85)';
+    ctx.fillRect(-r * 0.5, -2, r, 4);
+  } else if (type === 'shooter') {
+    ctx.shadowColor = 'rgba(255,184,107,0.9)';
+    ctx.shadowBlur = 18;
+    const g = ctx.createLinearGradient(-r, -r, r, r);
+    g.addColorStop(0, '#4a2b00');
+    g.addColorStop(0.5, '#ffb86b');
+    g.addColorStop(1, '#4a2b00');
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.moveTo(-r, -r * 0.9);
+    ctx.lineTo(r * 0.6, 0);
+    ctx.lineTo(-r, r * 0.9);
+    ctx.closePath();
+    ctx.fill();
+    ctx.shadowBlur = 0;
+    ctx.strokeStyle = 'rgba(255,255,255,0.25)';
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+  } else if (type === 'waver') {
+    drawNeonCircle(r, '#ffc3ea', '#5a2246', 'rgba(255,163,209,0.9)', null);
+    ctx.fillStyle = 'rgba(255,255,255,0.8)';
+    ctx.fillRect(-r * 0.6, -r * 0.15, r * 1.2, r * 0.3);
+  } else if (type === 'charger') {
+    ctx.shadowColor = 'rgba(255,213,74,0.9)'; ctx.shadowBlur = 16;
+    const g = ctx.createLinearGradient(-r, -r, r, r);
+    g.addColorStop(0, '#472f00'); g.addColorStop(0.5, '#ffd54a'); g.addColorStop(1, '#472f00');
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.moveTo(-r * 0.9, -r * 0.65);
+    ctx.lineTo(r * 0.95, 0);
+    ctx.lineTo(-r * 0.9, r * 0.65);
     ctx.closePath();
     ctx.fill();
   } else if (type === 'tank') {
-    ctx.fillStyle = '#8ecae6';
-    ctx.fillRect(-r, -r*0.7, r*2, r*1.4);
+    ctx.shadowColor = 'rgba(142,202,230,0.9)'; ctx.shadowBlur = 20;
+    const body = ctx.createLinearGradient(-r, 0, r, 0);
+    body.addColorStop(0, '#052b3a'); body.addColorStop(1, '#8ecae6');
+    ctx.fillStyle = body;
+    ctx.fillRect(-r, -r * 0.7, r * 2, r * 1.4);
+    ctx.shadowBlur = 0;
     ctx.fillStyle = '#023047';
-    ctx.fillRect(-r*0.6, -r*0.25, r*1.2, r*0.5);
+    ctx.fillRect(-r * 0.6, -r * 0.25, r * 1.2, r * 0.5);
+    // 装甲の縁取り
+    ctx.strokeStyle = 'rgba(255,255,255,0.25)';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(-r, -r * 0.7, r * 2, r * 1.4);
   } else if (type === 'mine') {
-    ctx.fillStyle = '#c2c2c2';
-    ctx.beginPath(); ctx.arc(0,0,r,0,Math.PI*2); ctx.fill();
-    ctx.strokeStyle = '#666'; ctx.lineWidth = 2;
+    drawNeonCircle(r, '#c2c2c2', '#353535', 'rgba(220,220,220,0.8)', null);
+    ctx.strokeStyle = '#888'; ctx.lineWidth = 2;
     for (let i = 0; i < 6; i++) {
-      const a = (Math.PI*2) * (i/6);
+      const a = (Math.PI * 2) * (i / 6);
       ctx.beginPath();
-      ctx.moveTo(Math.cos(a)*r*0.4, Math.sin(a)*r*0.4);
-      ctx.lineTo(Math.cos(a)*r*0.9, Math.sin(a)*r*0.9);
+      ctx.moveTo(Math.cos(a) * r * 0.4, Math.sin(a) * r * 0.4);
+      ctx.lineTo(Math.cos(a) * r * 0.9, Math.sin(a) * r * 0.9);
       ctx.stroke();
     }
   } else if (type === 'sniper') {
-    ctx.fillStyle = '#ff8fab';
+    ctx.shadowColor = 'rgba(255,143,171,0.95)';
+    ctx.shadowBlur = 20;
+    const g = ctx.createLinearGradient(-r, 0, r, 0);
+    g.addColorStop(0, '#4a1020'); g.addColorStop(0.5, '#ff8fab'); g.addColorStop(1, '#4a1020');
+    ctx.fillStyle = g;
     ctx.beginPath();
     ctx.moveTo(-r, 0);
-    ctx.lineTo(r*0.8, -r*0.5);
-    ctx.lineTo(r*0.8, r*0.5);
+    ctx.lineTo(r * 0.9, -r * 0.55);
+    ctx.lineTo(r * 0.9, r * 0.55);
     ctx.closePath();
     ctx.fill();
   }
@@ -584,6 +677,40 @@ function drawEnemy(x, y, type, r) {
 
 function drawBullet(x,y,r,color) {
   ctx.save(); ctx.fillStyle = color; ctx.beginPath(); ctx.arc(x,y,r,0,Math.PI*2); ctx.fill(); ctx.restore();
+}
+
+// 弾のリッチ描画（グロー + トレイル）
+function drawBulletAdvanced(b, color) {
+  ctx.save();
+  // トレイル（前フレーム位置から現在位置へ）
+  if (b.prevX !== undefined && b.prevY !== undefined) {
+    const prevOp = ctx.globalCompositeOperation;
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.strokeStyle = color;
+    ctx.globalAlpha = 0.45;
+    ctx.lineWidth = Math.max(1.5, b.radius * 1.2);
+    ctx.beginPath();
+    ctx.moveTo(b.prevX, b.prevY);
+    ctx.lineTo(b.x, b.y);
+    ctx.stroke();
+    ctx.globalAlpha = 1;
+    ctx.globalCompositeOperation = prevOp;
+  }
+
+  // 本体グロー
+  ctx.shadowColor = color;
+  ctx.shadowBlur = 16;
+  ctx.fillStyle = color;
+  ctx.beginPath();
+  ctx.arc(b.x, b.y, b.radius, 0, Math.PI * 2);
+  ctx.fill();
+  // コア（白）
+  ctx.shadowBlur = 0;
+  ctx.fillStyle = 'rgba(255,255,255,0.9)';
+  ctx.beginPath();
+  ctx.arc(b.x, b.y, Math.max(1, b.radius * 0.5), 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
 }
 
 function drawHealItem(x, y, r) {
@@ -644,17 +771,37 @@ function drawPowerItem(x, y, r) {
 function drawCompanion(x, y) {
   ctx.save();
   ctx.translate(x, y);
-  ctx.fillStyle = '#b08cff';
+  // 弱い回転で躍動感
+  ctx.rotate(Math.sin(world.time * 3 + y * 0.01) * 0.1);
+  // 本体
+  const r = 10;
+  const bodyGrad = ctx.createLinearGradient(-r, -r, r, r);
+  bodyGrad.addColorStop(0, '#2a144a');
+  bodyGrad.addColorStop(1, '#b08cff');
+  ctx.shadowColor = 'rgba(176,140,255,0.95)';
+  ctx.shadowBlur = 14;
+  ctx.fillStyle = bodyGrad;
   ctx.beginPath();
-  ctx.moveTo(-8, -6);
-  ctx.lineTo(8, 0);
-  ctx.lineTo(-8, 6);
+  ctx.moveTo(r, 0);
+  ctx.lineTo(-r * 0.6, -r * 0.7);
+  ctx.lineTo(-r * 0.6, r * 0.7);
   ctx.closePath();
   ctx.fill();
+  // 外周リング
+  ctx.shadowBlur = 0;
+  ctx.strokeStyle = 'rgba(255,255,255,0.35)';
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.arc(-r * 0.15, 0, r * 0.9, 0, Math.PI * 2);
+  ctx.stroke();
   ctx.restore();
 }
 
 function drawParticles(dt) {
+  ctx.save();
+  // 加算合成でネオングロー
+  const prevOp = ctx.globalCompositeOperation;
+  ctx.globalCompositeOperation = 'lighter';
   for (let i = particles.length - 1; i >= 0; i--) {
     const p = particles[i];
     p.life -= dt; if (p.life <= 0) { particles.splice(i,1); continue; }
@@ -662,7 +809,27 @@ function drawParticles(dt) {
     ctx.globalAlpha = Math.max(0, Math.min(1, p.life));
     ctx.fillStyle = p.color;
     ctx.fillRect(p.x, p.y, p.size, p.size);
-    ctx.globalAlpha = 1;
+  }
+  ctx.globalAlpha = 1;
+  ctx.globalCompositeOperation = prevOp;
+  ctx.restore();
+}
+
+// エンジン噴射粒子を放出
+function emitThrusterFlame(x, y, baseColor) {
+  const count = 2 + Math.floor(rand() * 2);
+  for (let i = 0; i < count; i++) {
+    const ang = (Math.PI * 2) * (0.48 + rand() * 0.04); // ほぼ左向き
+    const sp = 120 + rand() * 120;
+    particles.push({
+      x: x + rand() * 2,
+      y: y + (rand() - 0.5) * 6,
+      vx: Math.cos(ang) * sp,
+      vy: Math.sin(ang) * sp,
+      life: 0.25 + rand() * 0.25,
+      color: 'rgba(120,220,255,0.6)',
+      size: 1 + rand() * 2,
+    });
   }
 }
 
@@ -766,11 +933,11 @@ function loop(now) {
 
   // Update bullets
   for (let i = bullets.length - 1; i >= 0; i--) {
-    const b = bullets[i]; b.x += b.vx * dt; b.y += b.vy * dt;
+    const b = bullets[i]; b.prevX = b.x; b.prevY = b.y; b.x += b.vx * dt; b.y += b.vy * dt;
     if (b.x > w + 20 || b.y < -20 || b.y > h + 20) { bullets.splice(i,1); continue; }
   }
   for (let i = enemyBullets.length - 1; i >= 0; i--) {
-    const b = enemyBullets[i]; b.x += b.vx * dt; b.y += b.vy * dt;
+    const b = enemyBullets[i]; b.prevX = b.x; b.prevY = b.y; b.x += b.vx * dt; b.y += b.vy * dt;
     if (b.x < -20 || b.x > w + 20 || b.y < -20 || b.y > h + 20) { enemyBullets.splice(i,1); continue; }
   }
 
@@ -923,6 +1090,8 @@ function loop(now) {
   // Draw player
   if (player.alive) {
     const blink = player.invul > 0 ? (Math.floor(world.time * 20) % 2 === 0) : true;
+    // 噴射粒子（先に描いて奥行きを表現）
+    emitThrusterFlame(player.x - player.radius * 0.8, player.y, '#57c7ff');
     if (blink) drawShip(player.x, player.y, '#57c7ff', player.radius);
     // シールド可視化
     if (player.shieldCharges > 0) {
@@ -943,7 +1112,10 @@ function loop(now) {
   // Draw bullets
   // 子機
   for (const c of companions) {
-    if (player.alive) drawCompanion(c.x ?? (player.x - 4), c.y ?? (player.y + c.offsetY));
+    if (player.alive) {
+      emitThrusterFlame((c.x ?? (player.x - 4)) - 8, c.y ?? (player.y + c.offsetY), '#b08cff');
+      drawCompanion(c.x ?? (player.x - 4), c.y ?? (player.y + c.offsetY));
+    }
   }
   // 回復アイテム
   for (const it of healItems) drawHealItem(it.x, it.y, it.radius);
@@ -954,8 +1126,8 @@ function loop(now) {
   // パワーアイテム
   for (const it of powerItems) drawPowerItem(it.x, it.y, it.radius);
 
-  for (const b of bullets) drawBullet(b.x, b.y, b.radius, '#9bffb0');
-  for (const b of enemyBullets) drawBullet(b.x, b.y, b.radius, '#ff9b9b');
+  for (const b of bullets) drawBulletAdvanced(b, '#9bffb0');
+  for (const b of enemyBullets) drawBulletAdvanced(b, '#ff9b9b');
 
   // Draw particles
   drawParticles(dt);
