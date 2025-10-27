@@ -49,6 +49,10 @@ const fireBtn = document.getElementById('fireBtn');
 const stageModalEl = document.getElementById('stageModal');
 const stageModalTitleEl = document.getElementById('stageModalTitle');
 const stageModalBtn = document.getElementById('stageModalBtn');
+// ボス用HUD
+const bossHudEl = document.getElementById('bossHud');
+const bossLabelEl = document.getElementById('bossLabel');
+const bossBarFillEl = document.getElementById('bossBarFill');
 
 // Game state
 const State = {
@@ -109,6 +113,13 @@ const shieldItems = []; // {x,y,vx,vy,radius}
 const companionItems = []; // {x,y,vx,vy,radius}
 const companions = []; // {offsetY, fireCooldown}
 const powerItems = []; // {x,y,vx,vy,radius}
+
+// Boss state
+let boss = null; // {x,y,radius,hp,maxHp,vx,vy,type,stage,fireCooldown,state,enterTargetX}
+let bossActive = false;
+const bossSpawnedForStage = { 1: false, 2: false, 3: false, 4: false, 5: false };
+const BOSS_DAMAGE_PER_HIT = 20; // プレイヤー弾1ヒット=20（プレイヤー被弾と同等）
+const BOSS_CONTACT_DAMAGE_TO_PLAYER = 30; // 接触時のプレイヤー被ダメ（既存と同等）
 
 // Companions (子機)
 const MAX_COMPANIONS = 2;
@@ -504,6 +515,10 @@ function resetGame() {
   // ステージ状態を初期化
   currentStage = 1; pendingStage = 1; stageTransitionPending = false;
   if (stageModalEl) stageModalEl.classList.add('hidden');
+  // ボス状態を初期化
+  boss = null; bossActive = false;
+  bossSpawnedForStage[1] = bossSpawnedForStage[2] = bossSpawnedForStage[3] = bossSpawnedForStage[4] = bossSpawnedForStage[5] = false;
+  if (bossHudEl) bossHudEl.classList.add('hidden');
   overlayEl.classList.add('hidden');
   restartBtn.classList.add('hidden');
   finalStatsEl.classList.add('hidden');
@@ -673,6 +688,177 @@ function drawEnemy(x, y, type, r) {
     ctx.fill();
   }
   ctx.restore();
+}
+
+// ===== Boss helpers =====
+function getBossMaxHpForStage(stage) {
+  if (stage === 1) return 800;
+  if (stage === 2) return 1200;
+  if (stage === 3) return 1600;
+  if (stage === 4) return 2000;
+  return 2600; // stage 5
+}
+
+function getBossTypeForStage(stage) {
+  if (stage === 1) return 'grunt';
+  if (stage === 2) return 'shooter';
+  if (stage === 3) return 'waver';
+  if (stage === 4) return 'tank';
+  return 'sniper'; // stage 5
+}
+
+function getBossRadiusForStage(stage) {
+  // ステージ毎にやや大型化
+  return 42 + (stage - 1) * 6;
+}
+
+function getBossFireIntervalBase(stage) {
+  // ステージが上がるほど発射間隔を短縮
+  const base = 1.2 - (stage - 1) * 0.12;
+  return Math.max(0.55, base);
+}
+
+function lerp(a, b, t) { return a + (b - a) * t; }
+function lerpColor(c1, c2, t) {
+  const a = c1.match(/#(..)(..)(..)/).slice(1).map((x) => parseInt(x, 16));
+  const b = c2.match(/#(..)(..)(..)/).slice(1).map((x) => parseInt(x, 16));
+  const r = Math.round(lerp(a[0], b[0], t));
+  const g = Math.round(lerp(a[1], b[1], t));
+  const bch = Math.round(lerp(a[2], b[2], t));
+  return `rgb(${r},${g},${bch})`;
+}
+function getBossBarColor(stage, ratio) {
+  // ratio: 1.0 -> 0.0 で色遷移
+  const yellow = '#ffd166';
+  const green = '#06d6a0';
+  const orange = '#ff8c42';
+  const clampRatio = Math.max(0, Math.min(1, ratio));
+  if (stage === 1) {
+    // 黄→緑
+    return lerpColor(yellow, green, 1 - clampRatio);
+  }
+  if (stage >= 2) {
+    // オレンジ→黄色→緑（2区間補間）
+    if (clampRatio > 0.5) {
+      const t = (clampRatio - 0.5) / 0.5; // 1.0..0.5
+      return lerpColor(yellow, orange, t); // 高HP側: オレンジに近く
+    } else {
+      const t = clampRatio / 0.5; // 0.5..0.0
+      return lerpColor(green, yellow, t); // 低HP側: 緑寄りへ
+    }
+  }
+  return lerpColor(yellow, green, 1 - clampRatio);
+}
+
+function updateBossHud() {
+  if (!bossHudEl || !bossBarFillEl) return;
+  if (!bossActive || !boss) {
+    bossHudEl.classList.add('hidden');
+    return;
+  }
+  const ratio = Math.max(0, Math.min(1, boss.hp / boss.maxHp));
+  bossHudEl.classList.remove('hidden');
+  bossBarFillEl.style.width = `${ratio * 100}%`;
+  bossBarFillEl.style.background = getBossBarColor(boss.stage, ratio);
+  if (bossLabelEl) bossLabelEl.textContent = `BOSS S${boss.stage}`;
+}
+
+function spawnBossForStage(stage) {
+  const w = canvas.width / renderScale;
+  const h = canvas.height / renderScale;
+  const type = getBossTypeForStage(stage);
+  boss = {
+    x: w + 80,
+    y: h * 0.5,
+    radius: getBossRadiusForStage(stage),
+    hp: getBossMaxHpForStage(stage),
+    maxHp: getBossMaxHpForStage(stage),
+    vx: -Math.max(120, world.speed * 0.9),
+    vy: 0,
+    type,
+    stage,
+    fireCooldown: 1.5,
+    state: 'enter',
+    enterTargetX: w * 0.72,
+    verticalDir: (rand() < 0.5 ? -1 : 1),
+  };
+  bossActive = true;
+  bossSpawnedForStage[stage] = true;
+  enemies.length = 0; // 通常敵を掃除
+  enemyBullets.length = 0; // 弾も一旦掃除
+  updateBossHud();
+}
+
+function bossAttack() {
+  if (!boss) return;
+  const baseSpeed = 200 + boss.stage * 40;
+  const addBullet = (x, y, vx, vy, r = 5) => {
+    enemyBullets.push({ x, y, prevX: x, prevY: y, vx, vy, radius: r });
+  };
+  const aimed = (n, spreadDeg) => {
+    const baseAng = Math.atan2(player.y - boss.y, player.x - boss.x);
+    const spread = (spreadDeg * Math.PI) / 180;
+    for (let k = 0; k < n; k++) {
+      const t = n === 1 ? 0 : (k - (n - 1) / 2) / (n - 1);
+      const ang = baseAng + t * spread;
+      addBullet(boss.x - boss.radius * 0.8, boss.y, Math.cos(ang) * baseSpeed, Math.sin(ang) * baseSpeed, 4.5);
+    }
+  };
+  const radial = (n, speed = baseSpeed * 0.9) => {
+    for (let k = 0; k < n; k++) {
+      const ang = (Math.PI * 2) * (k / n);
+      addBullet(boss.x, boss.y, Math.cos(ang) * speed, Math.sin(ang) * speed, 4.5);
+    }
+  };
+
+  // ステージ別にパターンを選択
+  const r = rand();
+  if (boss.stage === 1) {
+    if (r < 0.6) aimed(3, 18); else radial(10, baseSpeed * 0.75);
+  } else if (boss.stage === 2) {
+    if (r < 0.45) aimed(5, 28); else if (r < 0.8) aimed(6, 14); else radial(12, baseSpeed * 0.85);
+  } else if (boss.stage === 3) {
+    if (r < 0.35) aimed(7, 32); else if (r < 0.7) radial(14); else { aimed(4, 10); radial(10, baseSpeed * 0.8); }
+  } else if (boss.stage === 4) {
+    if (r < 0.4) { aimed(7, 36); aimed(5, 20); }
+    else if (r < 0.75) radial(18);
+    else { aimed(6, 18); radial(12, baseSpeed * 0.9); }
+  } else { // stage 5
+    if (r < 0.35) { aimed(9, 38); aimed(7, 22); }
+    else if (r < 0.7) radial(22, baseSpeed * 0.95);
+    else { radial(12, baseSpeed * 0.8); aimed(8, 26); }
+  }
+
+  boss.fireCooldown = (0.7 + rand() * 0.5) * getBossFireIntervalBase(boss.stage);
+}
+
+function updateBoss(dt) {
+  if (!bossActive || !boss) return;
+  const w = canvas.width / renderScale;
+  const h = canvas.height / renderScale;
+  if (boss.state === 'enter') {
+    boss.x += boss.vx * dt;
+    if (boss.x <= boss.enterTargetX) {
+      boss.state = 'fight';
+      boss.vx = -world.speed * 0.2; // ゆっくり流れる
+    }
+  } else {
+    // 戦闘中はゆっくり上下動
+    const vyTarget = 60 * boss.verticalDir;
+    boss.vy += (vyTarget - boss.vy) * 0.8 * dt;
+    boss.y += boss.vy * dt;
+    if ((boss.y < 40 && boss.verticalDir < 0) || (boss.y > h - 40 && boss.verticalDir > 0)) boss.verticalDir *= -1;
+    boss.x += boss.vx * dt;
+  }
+  // 画面外には出ない
+  boss.x = clamp(boss.x, 40, w - 20);
+  boss.y = clamp(boss.y, 40, h - 40);
+
+  // 攻撃
+  boss.fireCooldown -= dt;
+  if (boss.fireCooldown <= 0 && boss.state !== 'enter') bossAttack();
+
+  updateBossHud();
 }
 
 function drawBullet(x,y,r,color) {
@@ -883,20 +1069,22 @@ function loop(now) {
   }
 
   // Enemies spawn（ステージ2/3で全体頻度を抑制しつつ同時数を制限）
-  enemySpawnTimer -= dt;
-  if (enemySpawnTimer <= 0) {
-    const tuning = getSpawnTuningForStage(currentStage);
-    const base = 0.7 - Math.min(0.4, world.time * 0.02);
-    const nextInterval = base * (0.9 + rand()*0.3) * tuning.intervalMul;
-    const maxEnemies = getMaxEnemiesForStage(currentStage);
-    if (enemies.length >= maxEnemies) {
-      enemySpawnTimer = nextInterval;
-    } else {
-      spawnEnemy();
-      if (enemies.length < maxEnemies && rand() < tuning.extraChance) {
+  if (!bossActive) {
+    enemySpawnTimer -= dt;
+    if (enemySpawnTimer <= 0) {
+      const tuning = getSpawnTuningForStage(currentStage);
+      const base = 0.7 - Math.min(0.4, world.time * 0.02);
+      const nextInterval = base * (0.9 + rand()*0.3) * tuning.intervalMul;
+      const maxEnemies = getMaxEnemiesForStage(currentStage);
+      if (enemies.length >= maxEnemies) {
+        enemySpawnTimer = nextInterval;
+      } else {
         spawnEnemy();
+        if (enemies.length < maxEnemies && rand() < tuning.extraChance) {
+          spawnEnemy();
+        }
+        enemySpawnTimer = nextInterval;
       }
-      enemySpawnTimer = nextInterval;
     }
   }
 
@@ -1038,6 +1226,32 @@ function loop(now) {
     }
   }
 
+  // Collisions - bullets vs boss
+  if (bossActive && boss) {
+    for (let j = bullets.length - 1; j >= 0; j--) {
+      const b = bullets[j]; if (b.from !== 'player' && b.from !== 'companion') continue;
+      if (circleOverlap(boss.x, boss.y, boss.radius, b.x, b.y, b.radius)) {
+        bullets.splice(j,1);
+        boss.hp -= BOSS_DAMAGE_PER_HIT;
+        addExplosion(b.x, b.y, '#9bffb0', 8);
+        updateBossHud();
+        if (boss.hp <= 0) {
+          // Boss defeated
+          addExplosion(boss.x, boss.y, '#ffd166', 40);
+          addExplosion(boss.x, boss.y, '#ff9b9b', 30);
+          bossActive = false;
+          boss = null;
+          updateBossHud();
+          // ステージクリア演出（段階的に進行）
+          pendingStage = Math.min(5, currentStage + 1);
+          stageTransitionPending = true;
+          showStageClearModal(currentStage);
+          break;
+        }
+      }
+    }
+  }
+
   // Collisions - enemy bullets vs player, enemies vs player
   if (player.invul > 0) player.invul -= dt;
   if (player.alive) {
@@ -1071,11 +1285,26 @@ function loop(now) {
         }
       }
     }
+    // Boss vs player collision
+    if (bossActive && boss && circleOverlap(player.x, player.y, player.radius, boss.x, boss.y, boss.radius)) {
+      if (player.invul <= 0) {
+        if (player.shieldCharges > 0) {
+          player.shieldCharges -= 1;
+          player.invul = 0.25;
+          addExplosion(player.x, player.y, '#7cc7ff', 14);
+        } else {
+          player.hp -= BOSS_CONTACT_DAMAGE_TO_PLAYER; player.invul = 0.6; addExplosion(player.x, player.y, '#ff6b6b', 14);
+        }
+      }
+    }
   }
 
   // Health UI and score
   healthFillEl.style.width = `${clamp(player.hp / player.maxHp, 0, 1) * 100}%`;
   scoreEl.textContent = score.toString();
+
+  // Boss update (after all moves, so描画手前で)
+  updateBoss(dt);
 
   // ステージ進行チェック（スコア到達で自動）
   checkStageProgression();
@@ -1104,6 +1333,11 @@ function loop(now) {
       ctx.stroke();
       ctx.restore();
     }
+  }
+
+  // Draw boss
+  if (bossActive && boss) {
+    drawEnemy(boss.x, boss.y, boss.type, boss.radius);
   }
 
   // Draw enemies
@@ -1143,6 +1377,8 @@ function endGame() {
   finalStatsEl.textContent = `SCORE: ${score}`;
   if (score > highScore) { highScore = score; localStorage.setItem('shmupZeroHighScore', String(highScore)); }
   highScoreEl.textContent = highScore.toString();
+  // ボスHUDを隠す
+  if (bossHudEl) bossHudEl.classList.add('hidden');
 }
 
 // ステージクリア演出 & 再開
@@ -1156,11 +1392,12 @@ function showStageClearModal(clearedStage) {
 
 function checkStageProgression() {
   if (stageTransitionPending || gameState !== State.Playing) return;
-  const s = getStageForScore(score);
-  if (s > currentStage) {
-    pendingStage = s;
-    stageTransitionPending = true;
-    showStageClearModal(currentStage);
+  const stageEndScore = currentStage * 5000; // ステージ毎のクリア到達スコア
+  if (score >= stageEndScore) {
+    // まだボスを出していないなら出現
+    if (!bossActive && !bossSpawnedForStage[currentStage]) {
+      spawnBossForStage(currentStage);
+    }
   }
 }
 

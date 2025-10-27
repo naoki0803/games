@@ -34,6 +34,15 @@
       <!-- ステージ領域（キャンバス） -->
       <div id="stage" class="stage">
         <canvas id="gameCanvas" aria-label="横スクロールシューティング"></canvas>
+        <!-- ボスHPバー（キャンバス上部中央に重ねる） -->
+        <div id="bossHud" class="boss-hud hidden">
+          <div class="bossbar">
+            <div id="bossLabel" class="bossbar-label">BOSS</div>
+            <div class="bossbar-track">
+              <div id="bossBarFill" class="bossbar-fill" style="width:100%"></div>
+            </div>
+          </div>
+        </div>
       </div>
 
       <!-- モバイル発射ボタン（右下固定） -->
