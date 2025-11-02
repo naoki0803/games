@@ -692,11 +692,12 @@ function drawEnemy(x, y, type, r) {
 
 // ===== Boss helpers =====
 function getBossMaxHpForStage(stage) {
-  if (stage === 1) return 800;
-  if (stage === 2) return 1200;
-  if (stage === 3) return 1600;
-  if (stage === 4) return 2000;
-  return 2600; // stage 5
+  // 体力を2倍にして撃破までの時間を延長
+  if (stage === 1) return 1600;
+  if (stage === 2) return 2400;
+  if (stage === 3) return 3200;
+  if (stage === 4) return 4000;
+  return 5200; // stage 5
 }
 
 function getBossTypeForStage(stage) {
