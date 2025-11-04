@@ -39,6 +39,7 @@ window.addEventListener('orientationchange', () => { setTimeout(resizeCanvas, 50
 const overlayEl = document.getElementById('overlay');
 const startBtn = document.getElementById('startBtn');
 const restartBtn = document.getElementById('restartBtn');
+const resumeStageBtn = document.getElementById('resumeStageBtn');
 const pauseBtn = document.getElementById('pauseBtn');
 const scoreEl = document.getElementById('scoreValue');
 const highScoreEl = document.getElementById('highScoreValue');
@@ -84,6 +85,8 @@ const player = {
   y: 0,
   radius: 16,
   speed: 420,
+  speedBoostMultiplier: 1,
+  speedBoostTimer: 0,
   hp: 100,
   maxHp: 100,
   fireCooldown: 0,
@@ -101,7 +104,7 @@ const player = {
 };
 
 // 自動射撃フラグ（true で常に自動射撃）
-const AUTO_FIRE = true;
+const AUTO_FIRE = false;
 
 // Entities
 const bullets = []; // {x,y,vx,vy,radius,from}
@@ -113,6 +116,7 @@ const shieldItems = []; // {x,y,vx,vy,radius}
 const companionItems = []; // {x,y,vx,vy,radius}
 const companions = []; // {offsetY, fireCooldown}
 const powerItems = []; // {x,y,vx,vy,radius}
+const speedItems = []; // {x,y,vx,vy,radius}
 
 // Boss state
 let boss = null; // {x,y,radius,hp,maxHp,vx,vy,type,stage,fireCooldown,state,enterTargetX}
@@ -129,6 +133,7 @@ const COMPANION_FIRE_RATE = 0.65; // メインより遅い
 let input = {
   up: false, down: false, left: false, right: false, shoot: false,
   pointerId: null, dragging: false, dragOffsetX: 0, dragOffsetY: 0,
+  targetX: null, targetY: null,
 };
 
 // Utilities
@@ -137,8 +142,8 @@ function circleOverlap(ax, ay, ar, bx, by, br) {
   const dx = ax - bx, dy = ay - by; return dx*dx + dy*dy <= (ar+br)*(ar+br);
 }
 
-// 現在の総ショット本数（1〜5）
-const MAX_SHOT_LINES = 5;
+// 現在の総ショット本数（1〜2）
+const MAX_SHOT_LINES = 2;
 function getTotalShotLines() {
   return clamp(1 + (player.shotPowerLevel || 0) + (player.extraShotLevelsFromCompanion || 0), 1, MAX_SHOT_LINES);
 }
@@ -200,6 +205,8 @@ const STAGE_SCORE_THRESHOLDS = [0, 5000, 10000, 15000, 20000];
 let currentStage = 1;
 let pendingStage = 1;
 let stageTransitionPending = false;
+let continueStage = 1;
+let continueScore = 0;
 
 function getStageForScore(sc) {
   if (sc >= STAGE_SCORE_THRESHOLDS[4]) return 5;
@@ -463,6 +470,8 @@ canvas.addEventListener('pointerdown', (e) => {
   // 記録: ポインタ位置とプレイヤー位置の差分
   input.dragOffsetX = player.x - px;
   input.dragOffsetY = player.y - py;
+  input.targetX = player.x;
+  input.targetY = player.y;
 });
 window.addEventListener('pointermove', (e) => {
   if (!input.dragging || e.pointerId !== input.pointerId) return;
@@ -472,23 +481,36 @@ window.addEventListener('pointermove', (e) => {
   const py = (e.clientY - rect.top);
   const targetX = px + (input.dragOffsetX || 0);
   const targetY = py + (input.dragOffsetY || 0);
-  player.x = clamp(targetX, 20, rect.width - 20);
-  player.y = clamp(targetY, 20, rect.height - 20);
+  input.targetX = clamp(targetX, 20, rect.width - 20);
+  input.targetY = clamp(targetY, 20, rect.height - 20);
 });
 window.addEventListener('pointerup', (e) => {
   if (e.pointerId !== input.pointerId) return;
   e.preventDefault();
-  input.dragging = false; input.pointerId = null;
+  input.dragging = false;
+  input.pointerId = null;
+  input.targetX = null;
+  input.targetY = null;
 });
 
 startBtn.addEventListener('click', () => startGame());
 restartBtn.addEventListener('click', () => startGame());
+if (resumeStageBtn) {
+  resumeStageBtn.addEventListener('click', () => {
+    startGame({ stage: continueStage, score: continueScore });
+  });
+}
 pauseBtn.addEventListener('click', () => togglePause());
 if (fireBtn) {
-  const startShooting = (e) => { e.preventDefault(); input.shoot = true; };
+  const startShooting = (e) => {
+    e.preventDefault();
+    input.shoot = true;
+    player.fireCooldown = 0;
+  };
   const stopShooting = (e) => { e.preventDefault(); input.shoot = false; };
   fireBtn.addEventListener('touchstart', startShooting, { passive: false });
   fireBtn.addEventListener('touchend', stopShooting, { passive: false });
+  fireBtn.addEventListener('touchcancel', stopShooting, { passive: false });
   fireBtn.addEventListener('mousedown', startShooting);
   window.addEventListener('mouseup', stopShooting);
 }
@@ -503,31 +525,60 @@ function togglePause() {
   }
 }
 
-function resetGame() {
-  score = 0;
-  world.scrollX = 0; world.time = 0; world.difficulty = 1;
-  player.x = 100; player.y = canvas.height / renderScale / 2; player.hp = player.maxHp; player.fireCooldown = 0; player.alive = true; player.invul = 1.2;
+function resetGame({ stage = 1, scoreOverride = null } = {}) {
+  const stageIndex = Math.max(0, stage - 1);
+  const defaultScore = STAGE_SCORE_THRESHOLDS[stageIndex] || 0;
+  score = (typeof scoreOverride === 'number') ? scoreOverride : defaultScore;
+  world.scrollX = 0;
+  world.time = Math.max(0, stage - 1) * 20;
+  world.difficulty = 1 + Math.floor(world.time / 20);
+  player.x = 100;
+  player.y = canvas.height / renderScale / 2;
+  player.hp = player.maxHp;
+  player.fireCooldown = 0;
+  player.alive = true;
+  player.invul = 1.2;
   player.shieldCharges = 0;
   player.shotPowerLevel = 0;
   player.extraShotLevelsFromCompanion = 0;
-  bullets.length = 0; enemies.length = 0; enemyBullets.length = 0; particles.length = 0; healItems.length = 0; shieldItems.length = 0; companionItems.length = 0; powerItems.length = 0; companions.length = 0;
+  player.speedBoostMultiplier = 1;
+  player.speedBoostTimer = 0;
+  bullets.length = 0;
+  enemies.length = 0;
+  enemyBullets.length = 0;
+  particles.length = 0;
+  healItems.length = 0;
+  shieldItems.length = 0;
+  companionItems.length = 0;
+  powerItems.length = 0;
+  speedItems.length = 0;
+  companions.length = 0;
   enemySpawnTimer = 0;
   // ステージ状態を初期化
-  currentStage = 1; pendingStage = 1; stageTransitionPending = false;
+  currentStage = stage;
+  pendingStage = stage;
+  stageTransitionPending = false;
   if (stageModalEl) stageModalEl.classList.add('hidden');
   // ボス状態を初期化
-  boss = null; bossActive = false;
+  boss = null;
+  bossActive = false;
   bossSpawnedForStage[1] = bossSpawnedForStage[2] = bossSpawnedForStage[3] = bossSpawnedForStage[4] = bossSpawnedForStage[5] = false;
   if (bossHudEl) bossHudEl.classList.add('hidden');
   overlayEl.classList.add('hidden');
   restartBtn.classList.add('hidden');
-  finalStatsEl.classList.add('hidden');
+  if (resumeStageBtn) resumeStageBtn.classList.add('hidden');
+  if (finalStatsEl) finalStatsEl.classList.add('hidden');
+  input.shoot = AUTO_FIRE;
+  healthFillEl.style.width = '100%';
+  scoreEl.textContent = score.toString();
 }
 
-function startGame() {
+function startGame(options = {}) {
   if (!isLandscape()) { updateOrientationNotice(); return; }
-  resetGame();
+  const { stage = 1, score: scoreOverride = null } = options;
+  resetGame({ stage, scoreOverride });
   gameState = State.Playing;
+  if (pauseBtn) pauseBtn.textContent = '⏸';
   lastTime = performance.now();
   requestAnimationFrame(loop);
 }
@@ -692,12 +743,14 @@ function drawEnemy(x, y, type, r) {
 
 // ===== Boss helpers =====
 function getBossMaxHpForStage(stage) {
-  // 体力を2倍にして撃破までの時間を延長
-  if (stage === 1) return 1600;
-  if (stage === 2) return 2400;
-  if (stage === 3) return 3200;
-  if (stage === 4) return 4000;
-  return 5200; // stage 5
+  // 体力をさらに強化（従来比5倍）
+  let base;
+  if (stage === 1) base = 1600;
+  else if (stage === 2) base = 2400;
+  else if (stage === 3) base = 3200;
+  else if (stage === 4) base = 4000;
+  else base = 5200; // stage 5
+  return base * 5;
 }
 
 function getBossTypeForStage(stage) {
@@ -955,6 +1008,28 @@ function drawPowerItem(x, y, r) {
   ctx.restore();
 }
 
+function drawSpeedItem(x, y, r) {
+  ctx.save();
+  ctx.translate(x, y);
+  const grad = ctx.createRadialGradient(0, 0, r * 0.2, 0, 0, r);
+  grad.addColorStop(0, '#fff3b0');
+  grad.addColorStop(1, '#ffbe0b');
+  ctx.fillStyle = grad;
+  ctx.beginPath();
+  ctx.arc(0, 0, r, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = '#ff9500';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(-r * 0.5, 0);
+  ctx.lineTo(r * 0.2, 0);
+  ctx.lineTo(r * 0.05, -r * 0.35);
+  ctx.moveTo(r * 0.2, 0);
+  ctx.lineTo(r * 0.05, r * 0.35);
+  ctx.stroke();
+  ctx.restore();
+}
+
 function drawCompanion(x, y) {
   ctx.save();
   ctx.translate(x, y);
@@ -1036,11 +1111,32 @@ function loop(now) {
   drawStars(dt);
 
   // Player input movement
+  if (player.speedBoostTimer > 0) {
+    player.speedBoostTimer -= dt;
+    if (player.speedBoostTimer <= 0) {
+      player.speedBoostTimer = 0;
+      player.speedBoostMultiplier = 1;
+    }
+  }
+  const moveSpeed = player.speed * (player.speedBoostMultiplier || 1);
   const mvx = (input.right ? 1 : 0) - (input.left ? 1 : 0);
   const mvy = (input.down ? 1 : 0) - (input.up ? 1 : 0);
   if (!input.dragging) {
-    player.x += mvx * player.speed * dt;
-    player.y += mvy * player.speed * dt;
+    player.x += mvx * moveSpeed * dt;
+    player.y += mvy * moveSpeed * dt;
+  } else if (input.targetX !== null && input.targetY !== null) {
+    const dx = input.targetX - player.x;
+    const dy = input.targetY - player.y;
+    const dist = Math.hypot(dx, dy);
+    if (dist > 0.5) {
+      const step = Math.min(dist, moveSpeed * dt);
+      const inv = 1 / dist;
+      player.x += dx * inv * step;
+      player.y += dy * inv * step;
+    } else {
+      player.x = input.targetX;
+      player.y = input.targetY;
+    }
   }
   const w = canvas.width / renderScale;
   const h = canvas.height / renderScale;
@@ -1188,10 +1284,25 @@ function loop(now) {
     it.vy += 30 * dt;
     if (it.x < -20 || it.y < -20 || it.y > h + 20) { powerItems.splice(i,1); continue; }
     if (player.alive && circleOverlap(player.x, player.y, player.radius, it.x, it.y, it.radius)) {
-      // 攻撃本数を強化（最大5本）
+      // 攻撃本数を強化（最大2本）
       player.shotPowerLevel = clamp((player.shotPowerLevel || 0) + 1, 0, MAX_SHOT_LINES - 1);
       addExplosion(it.x, it.y, '#ffd166', 14);
       powerItems.splice(i,1);
+      continue;
+    }
+  }
+
+  // スピードアップアイテムの更新・取得判定
+  for (let i = speedItems.length - 1; i >= 0; i--) {
+    const it = speedItems[i];
+    it.x += it.vx * dt; it.y += it.vy * dt;
+    it.vy += 30 * dt;
+    if (it.x < -20 || it.y < -20 || it.y > h + 20) { speedItems.splice(i,1); continue; }
+    if (player.alive && circleOverlap(player.x, player.y, player.radius, it.x, it.y, it.radius)) {
+      player.speedBoostMultiplier = 1.6;
+      player.speedBoostTimer = 6;
+      addExplosion(it.x, it.y, '#ffe066', 18);
+      speedItems.splice(i,1);
       continue;
     }
   }
@@ -1218,6 +1329,8 @@ function loop(now) {
             companionItems.push({ x: e.x, y: e.y, vx: -80, vy: (rand()-0.5)*40, radius: 9 });
           } else if (dropRoll < 0.14) {
             powerItems.push({ x: e.x, y: e.y, vx: -80, vy: (rand()-0.5)*40, radius: 9 });
+          } else if (dropRoll < 0.17) {
+            speedItems.push({ x: e.x, y: e.y, vx: -80, vy: (rand()-0.5)*40, radius: 9 });
           }
           enemies.splice(i,1);
           score += 50 + Math.floor(world.difficulty * 10);
@@ -1360,8 +1473,13 @@ function loop(now) {
   for (const it of companionItems) drawCompanionItem(it.x, it.y, it.radius);
   // パワーアイテム
   for (const it of powerItems) drawPowerItem(it.x, it.y, it.radius);
+  // スピードアップアイテム
+  for (const it of speedItems) drawSpeedItem(it.x, it.y, it.radius);
 
-  for (const b of bullets) drawBulletAdvanced(b, '#9bffb0');
+  for (const b of bullets) {
+    const color = b.from === 'companion' ? '#b08cff' : '#9bffb0';
+    drawBulletAdvanced(b, color);
+  }
   for (const b of enemyBullets) drawBulletAdvanced(b, '#ff9b9b');
 
   // Draw particles
@@ -1374,8 +1492,18 @@ function endGame() {
   gameState = State.GameOver;
   overlayEl.classList.remove('hidden');
   restartBtn.classList.remove('hidden');
-  finalStatsEl.classList.remove('hidden');
-  finalStatsEl.textContent = `SCORE: ${score}`;
+  continueStage = currentStage;
+  const stageIndex = Math.max(0, continueStage - 1);
+  continueScore = STAGE_SCORE_THRESHOLDS[stageIndex] || 0;
+  if (resumeStageBtn) {
+    resumeStageBtn.classList.remove('hidden');
+    const labelStage = Math.max(1, continueStage);
+    resumeStageBtn.textContent = `ステージ${labelStage}から再開`;
+  }
+  if (finalStatsEl) {
+    finalStatsEl.classList.remove('hidden');
+    finalStatsEl.textContent = `SCORE: ${score}`;
+  }
   if (score > highScore) { highScore = score; localStorage.setItem('shmupZeroHighScore', String(highScore)); }
   highScoreEl.textContent = highScore.toString();
   // ボスHUDを隠す
