@@ -896,30 +896,70 @@ function setupFlickController() {
     const flickController = document.getElementById('flickController');
     const flickIndicator = document.getElementById('flickIndicator');
     
-    let touchStartPos = { x: 0, y: 0 };
     let isTouchingFlick = false;
     let controllerCenter = { x: 0, y: 0 };
+    let indicatorMaxDistance = 0;
+
+    function updateControllerGeometry() {
+        const rect = flickController.getBoundingClientRect();
+        controllerCenter.x = rect.left + rect.width / 2;
+        controllerCenter.y = rect.top + rect.height / 2;
+        indicatorMaxDistance = Math.max(0, rect.width / 2 - flickIndicator.offsetWidth / 2);
+    }
+
+    function clampToBoundary(offsetX, offsetY) {
+        if (indicatorMaxDistance <= 0) {
+            return { x: 0, y: 0 };
+        }
+
+        const distance = Math.hypot(offsetX, offsetY);
+        if (distance <= indicatorMaxDistance) {
+            return { x: offsetX, y: offsetY };
+        }
+
+        const scale = indicatorMaxDistance / distance;
+        return { x: offsetX * scale, y: offsetY * scale };
+    }
+
+    function setIndicatorPosition(offsetX, offsetY) {
+        flickIndicator.style.left = `calc(50% + ${offsetX}px)`;
+        flickIndicator.style.top = `calc(50% + ${offsetY}px)`;
+        flickIndicator.style.transform = 'translate(-50%, -50%)';
+    }
+
+    function resetIndicator() {
+        setIndicatorPosition(0, 0);
+        flickIndicator.classList.remove('active');
+    }
+
+    function updateMovementState(offsetX) {
+        const threshold = 15;
+        if (offsetX <= -threshold) {
+            player.moveLeft = true;
+            player.moveRight = false;
+        } else if (offsetX >= threshold) {
+            player.moveRight = true;
+            player.moveLeft = false;
+        } else {
+            player.moveLeft = false;
+            player.moveRight = false;
+        }
+    }
     
     flickController.addEventListener('touchstart', (e) => {
         e.preventDefault();
         const touch = e.touches[0];
-        const rect = flickController.getBoundingClientRect();
-        
-        // コントローラーの中心を記録
-        controllerCenter.x = rect.left + rect.width / 2;
-        controllerCenter.y = rect.top + rect.height / 2;
-        
-        // タッチ開始位置を記録
-        touchStartPos.x = touch.clientX;
-        touchStartPos.y = touch.clientY;
-        
+        updateControllerGeometry();
+
+        const offsetX = touch.clientX - controllerCenter.x;
+        const offsetY = touch.clientY - controllerCenter.y;
+        const clamped = clampToBoundary(offsetX, offsetY);
+
         isTouchingFlick = true;
-        
-        // インジケーターを中央に配置
-        flickIndicator.style.left = '50%';
-        flickIndicator.style.top = '50%';
-        flickIndicator.style.transform = 'translate(-50%, -50%)';
+
         flickIndicator.classList.add('active');
+        setIndicatorPosition(clamped.x, clamped.y);
+        updateMovementState(clamped.x);
     });
     
     flickController.addEventListener('touchmove', (e) => {
@@ -927,40 +967,13 @@ function setupFlickController() {
         if (!isTouchingFlick) return;
         
         const touch = e.touches[0];
-        const deltaX = touch.clientX - touchStartPos.x;
-        const deltaY = touch.clientY - touchStartPos.y;
-        
-        // インジケーターの位置を更新（制限付き）
-        const maxDistance = 50;
-        const distance = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
-        
-        let indicatorX = deltaX;
-        let indicatorY = deltaY;
-        
-        if (distance > maxDistance) {
-            const angle = Math.atan2(deltaY, deltaX);
-            indicatorX = Math.cos(angle) * maxDistance;
-            indicatorY = Math.sin(angle) * maxDistance;
-        }
-        
-        flickIndicator.style.left = `calc(50% + ${indicatorX}px)`;
-        flickIndicator.style.top = `calc(50% + ${indicatorY}px)`;
-        flickIndicator.style.transform = 'translate(-50%, -50%)';
-        
-        // 移動方向を決定（閾値を設定）
-        const threshold = 15;
-        if (Math.abs(deltaX) > threshold) {
-            if (deltaX < 0) {
-                player.moveLeft = true;
-                player.moveRight = false;
-            } else {
-                player.moveRight = true;
-                player.moveLeft = false;
-            }
-        } else {
-            player.moveLeft = false;
-            player.moveRight = false;
-        }
+        updateControllerGeometry();
+        const offsetX = touch.clientX - controllerCenter.x;
+        const offsetY = touch.clientY - controllerCenter.y;
+        const clamped = clampToBoundary(offsetX, offsetY);
+
+        setIndicatorPosition(clamped.x, clamped.y);
+        updateMovementState(clamped.x);
     });
     
     flickController.addEventListener('touchend', (e) => {
@@ -968,7 +981,7 @@ function setupFlickController() {
         player.moveLeft = false;
         player.moveRight = false;
         isTouchingFlick = false;
-        flickIndicator.classList.remove('active');
+        resetIndicator();
     });
     
     flickController.addEventListener('touchcancel', (e) => {
@@ -976,7 +989,7 @@ function setupFlickController() {
         player.moveLeft = false;
         player.moveRight = false;
         isTouchingFlick = false;
-        flickIndicator.classList.remove('active');
+        resetIndicator();
     });
 }
 
