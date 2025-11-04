@@ -45,20 +45,21 @@
         </div>
       </div>
 
-      <!-- モバイル発射ボタン（右下固定） -->
-      <button id="fireBtn" class="btn fire-btn" aria-label="発射">🚀 発射</button>
+        <!-- モバイル発射ボタン（右下固定） -->
+        <button id="fireBtn" class="btn fire-btn" aria-label="発射">🚀 発射</button>
 
-      <div id="overlay" class="overlay hidden">
-        <div class="panel">
-          <h1 class="title">Shmup Zero</h1>
-          <p class="subtitle">横向きでプレイ推奨。ドラッグで移動 / 右下の発射ボタン長押しで射撃（PC: 矢印/WASD + スペース）</p>
-          <div class="controls">
-            <button id="startBtn" class="btn primary">ゲーム開始</button>
-            <button id="restartBtn" class="btn hidden">もう一度</button>
+        <div id="overlay" class="overlay hidden">
+          <div class="panel">
+            <h1 class="title">Shmup Zero</h1>
+            <p class="subtitle">横向きでプレイ推奨。ドラッグで移動 / 右下の発射ボタン長押しで射撃（PC: 矢印/WASD + スペース）</p>
+            <div class="controls">
+              <button id="startBtn" class="btn primary">ゲーム開始</button>
+              <button id="restartBtn" class="btn hidden">もう一度</button>
+              <button id="resumeStageBtn" class="btn hidden">同じステージから再開</button>
+            </div>
+            <div id="finalStats" class="final-stats hidden"></div>
           </div>
-          <div id="finalStats" class="final-stats hidden"></div>
         </div>
-      </div>
 
       <!-- ステージクリア時モーダル -->
       <div id="stageModal" class="overlay hidden">
