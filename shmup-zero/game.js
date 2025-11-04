@@ -131,10 +131,26 @@ const COMPANION_OFFSET_Y = 18; // 上下に並ぶ距離
 const COMPANION_FIRE_RATE = 0.65; // メインより遅い
 
 let input = {
-  up: false, down: false, left: false, right: false, shoot: false,
-  pointerId: null, dragging: false, dragOffsetX: 0, dragOffsetY: 0,
-  targetX: null, targetY: null,
+  up: false,
+  down: false,
+  left: false,
+  right: false,
+  shoot: false,
+  stickActive: false,
+  stickPointerId: null,
+  stickStartX: 0,
+  stickStartY: 0,
+  stickDisplayX: 0,
+  stickDisplayY: 0,
+  stickFingerX: 0,
+  stickFingerY: 0,
+  stickVectorX: 0,
+  stickVectorY: 0,
 };
+
+const VIRTUAL_STICK_MAX_DISTANCE = 80;
+const VIRTUAL_STICK_DEADZONE = 8;
+const VIRTUAL_STICK_VISUAL_RADIUS = 60;
 
 // Utilities
 function clamp(v, a, b) { return Math.max(a, Math.min(b, v)); }
@@ -460,37 +476,78 @@ window.addEventListener('keyup', (e) => {
 });
 
 // Controls - pointer / touch drag (relative, no teleport)
+function resetVirtualStick() {
+  input.stickActive = false;
+  input.stickPointerId = null;
+  input.stickVectorX = 0;
+  input.stickVectorY = 0;
+}
+
 canvas.addEventListener('pointerdown', (e) => {
+  if (e.pointerType === 'mouse' && e.button !== 0) return;
+  if (input.stickActive && input.stickPointerId !== e.pointerId) return;
   e.preventDefault();
   const rect = canvas.getBoundingClientRect();
-  const px = (e.clientX - rect.left);
-  const py = (e.clientY - rect.top);
-  input.pointerId = e.pointerId;
-  input.dragging = true;
-  // 記録: ポインタ位置とプレイヤー位置の差分
-  input.dragOffsetX = player.x - px;
-  input.dragOffsetY = player.y - py;
-  input.targetX = player.x;
-  input.targetY = player.y;
+  const px = e.clientX - rect.left;
+  const py = e.clientY - rect.top;
+  input.stickActive = true;
+  input.stickPointerId = e.pointerId;
+  input.stickStartX = px;
+  input.stickStartY = py;
+  input.stickDisplayX = px;
+  input.stickDisplayY = py;
+  input.stickFingerX = px;
+  input.stickFingerY = py;
+  input.stickVectorX = 0;
+  input.stickVectorY = 0;
+  try { canvas.setPointerCapture(e.pointerId); } catch (err) { /* noop */ }
 });
+
 window.addEventListener('pointermove', (e) => {
-  if (!input.dragging || e.pointerId !== input.pointerId) return;
+  if (!input.stickActive || e.pointerId !== input.stickPointerId) return;
   e.preventDefault();
   const rect = canvas.getBoundingClientRect();
-  const px = (e.clientX - rect.left);
-  const py = (e.clientY - rect.top);
-  const targetX = px + (input.dragOffsetX || 0);
-  const targetY = py + (input.dragOffsetY || 0);
-  input.targetX = clamp(targetX, 20, rect.width - 20);
-  input.targetY = clamp(targetY, 20, rect.height - 20);
+  const px = e.clientX - rect.left;
+  const py = e.clientY - rect.top;
+  input.stickFingerX = px;
+  input.stickFingerY = py;
+  const dx = px - input.stickStartX;
+  const dy = py - input.stickStartY;
+  const distance = Math.hypot(dx, dy);
+  const clampedDistance = Math.min(distance, VIRTUAL_STICK_MAX_DISTANCE);
+  if (distance > 0) {
+    const inv = 1 / distance;
+    input.stickDisplayX = input.stickStartX + dx * inv * clampedDistance;
+    input.stickDisplayY = input.stickStartY + dy * inv * clampedDistance;
+  } else {
+    input.stickDisplayX = input.stickStartX;
+    input.stickDisplayY = input.stickStartY;
+  }
+  if (distance <= VIRTUAL_STICK_DEADZONE) {
+    input.stickVectorX = 0;
+    input.stickVectorY = 0;
+  } else {
+    const effectiveDistance = Math.min(distance, VIRTUAL_STICK_MAX_DISTANCE);
+    const denominator = Math.max(1, VIRTUAL_STICK_MAX_DISTANCE - VIRTUAL_STICK_DEADZONE);
+    const strength = Math.max(0, Math.min(1, (effectiveDistance - VIRTUAL_STICK_DEADZONE) / denominator));
+    const inv = 1 / distance;
+    input.stickVectorX = dx * inv * strength;
+    input.stickVectorY = dy * inv * strength;
+  }
 });
-window.addEventListener('pointerup', (e) => {
-  if (e.pointerId !== input.pointerId) return;
+
+function handlePointerRelease(e) {
+  if (e.pointerId !== input.stickPointerId) return;
   e.preventDefault();
-  input.dragging = false;
-  input.pointerId = null;
-  input.targetX = null;
-  input.targetY = null;
+  try { canvas.releasePointerCapture(e.pointerId); } catch (err) { /* noop */ }
+  resetVirtualStick();
+}
+
+window.addEventListener('pointerup', handlePointerRelease);
+window.addEventListener('pointercancel', handlePointerRelease);
+canvas.addEventListener('lostpointercapture', (e) => {
+  if (e.pointerId !== input.stickPointerId) return;
+  resetVirtualStick();
 });
 
 startBtn.addEventListener('click', () => startGame());
@@ -821,20 +878,32 @@ function spawnBossForStage(stage) {
   const w = canvas.width / renderScale;
   const h = canvas.height / renderScale;
   const type = getBossTypeForStage(stage);
+  const radius = getBossRadiusForStage(stage);
+  const maxHp = getBossMaxHpForStage(stage);
+  const enterTargetX = w * 0.72;
+  const leftLimit = radius + 50;
+  const rightLimit = Math.max(leftLimit + 60, w - (radius + 30));
+  const patrolMinCandidate = enterTargetX - Math.max(140, w * 0.35);
+  const patrolMinX = clamp(patrolMinCandidate, leftLimit, rightLimit - 40);
+  const patrolMaxCandidate = enterTargetX + Math.max(60, w * 0.2);
+  const patrolMaxX = clamp(patrolMaxCandidate, patrolMinX + 40, rightLimit);
   boss = {
     x: w + 80,
     y: h * 0.5,
-    radius: getBossRadiusForStage(stage),
-    hp: getBossMaxHpForStage(stage),
-    maxHp: getBossMaxHpForStage(stage),
+    radius,
+    hp: maxHp,
+    maxHp,
     vx: -Math.max(120, world.speed * 0.9),
     vy: 0,
     type,
     stage,
     fireCooldown: 1.5,
     state: 'enter',
-    enterTargetX: w * 0.72,
+    enterTargetX,
     verticalDir: (rand() < 0.5 ? -1 : 1),
+    horizontalDir: -1,
+    patrolMinX,
+    patrolMaxX,
   };
   bossActive = true;
   bossSpawnedForStage[stage] = true;
@@ -894,7 +963,8 @@ function updateBoss(dt) {
     boss.x += boss.vx * dt;
     if (boss.x <= boss.enterTargetX) {
       boss.state = 'fight';
-      boss.vx = -world.speed * 0.2; // ゆっくり流れる
+      boss.vx = 0;
+      boss.horizontalDir = -1;
     }
   } else {
     // 戦闘中はゆっくり上下動
@@ -902,7 +972,19 @@ function updateBoss(dt) {
     boss.vy += (vyTarget - boss.vy) * 0.8 * dt;
     boss.y += boss.vy * dt;
     if ((boss.y < 40 && boss.verticalDir < 0) || (boss.y > h - 40 && boss.verticalDir > 0)) boss.verticalDir *= -1;
+    let patrolMin = boss.patrolMinX ?? (boss.radius + 40);
+    let patrolMax = boss.patrolMaxX ?? (w - (boss.radius + 40));
+    if (patrolMax - patrolMin < 30) {
+      const mid = (patrolMin + patrolMax) / 2;
+      patrolMin = mid - 15;
+      patrolMax = mid + 15;
+    }
+    const desiredSpeed = Math.max(90, world.speed * 0.35);
+    const dir = boss.horizontalDir ?? -1;
+    boss.vx += ((dir * desiredSpeed) - boss.vx) * 3 * dt;
     boss.x += boss.vx * dt;
+    if (boss.x <= patrolMin && (boss.horizontalDir ?? -1) < 0) boss.horizontalDir = 1;
+    else if (boss.x >= patrolMax && (boss.horizontalDir ?? 1) > 0) boss.horizontalDir = -1;
   }
   // 画面外には出ない
   boss.x = clamp(boss.x, 40, w - 20);
@@ -1059,6 +1141,48 @@ function drawCompanion(x, y) {
   ctx.restore();
 }
 
+function drawVirtualStickOverlay() {
+  if (!input.stickActive) return;
+  ctx.save();
+  ctx.lineWidth = 2.5;
+  ctx.strokeStyle = 'rgba(255,255,255,0.25)';
+  ctx.beginPath();
+  ctx.arc(input.stickStartX, input.stickStartY, VIRTUAL_STICK_VISUAL_RADIUS, 0, Math.PI * 2);
+  ctx.stroke();
+
+  ctx.fillStyle = 'rgba(87,199,255,0.18)';
+  ctx.beginPath();
+  ctx.arc(input.stickStartX, input.stickStartY, 12, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.strokeStyle = 'rgba(87,199,255,0.85)';
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  ctx.moveTo(input.stickStartX, input.stickStartY);
+  ctx.lineTo(input.stickDisplayX, input.stickDisplayY);
+  ctx.stroke();
+
+  ctx.fillStyle = 'rgba(87,199,255,0.35)';
+  ctx.beginPath();
+  ctx.arc(input.stickDisplayX, input.stickDisplayY, 18, 0, Math.PI * 2);
+  ctx.fill();
+
+  const fingerDx = input.stickFingerX - input.stickDisplayX;
+  const fingerDy = input.stickFingerY - input.stickDisplayY;
+  if (Math.hypot(fingerDx, fingerDy) > 2.5) {
+    ctx.fillStyle = 'rgba(87,199,255,0.18)';
+    ctx.beginPath();
+    ctx.arc(input.stickFingerX, input.stickFingerY, 14, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(87,199,255,0.55)';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(input.stickFingerX, input.stickFingerY, 14, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
 function drawParticles(dt) {
   ctx.save();
   // 加算合成でネオングロー
@@ -1119,24 +1243,19 @@ function loop(now) {
     }
   }
   const moveSpeed = player.speed * (player.speedBoostMultiplier || 1);
-  const mvx = (input.right ? 1 : 0) - (input.left ? 1 : 0);
-  const mvy = (input.down ? 1 : 0) - (input.up ? 1 : 0);
-  if (!input.dragging) {
-    player.x += mvx * moveSpeed * dt;
-    player.y += mvy * moveSpeed * dt;
-  } else if (input.targetX !== null && input.targetY !== null) {
-    const dx = input.targetX - player.x;
-    const dy = input.targetY - player.y;
-    const dist = Math.hypot(dx, dy);
-    if (dist > 0.5) {
-      const step = Math.min(dist, moveSpeed * dt);
-      const inv = 1 / dist;
-      player.x += dx * inv * step;
-      player.y += dy * inv * step;
-    } else {
-      player.x = input.targetX;
-      player.y = input.targetY;
-    }
+  let mvx = (input.right ? 1 : 0) - (input.left ? 1 : 0);
+  let mvy = (input.down ? 1 : 0) - (input.up ? 1 : 0);
+  if (input.stickActive) {
+    mvx += input.stickVectorX;
+    mvy += input.stickVectorY;
+  }
+  const moveLen = Math.hypot(mvx, mvy);
+  if (moveLen > 0.001) {
+    const normX = mvx / moveLen;
+    const normY = mvy / moveLen;
+    const cappedLen = Math.min(moveLen, 1);
+    player.x += normX * cappedLen * moveSpeed * dt;
+    player.y += normY * cappedLen * moveSpeed * dt;
   }
   const w = canvas.width / renderScale;
   const h = canvas.height / renderScale;
@@ -1484,6 +1603,9 @@ function loop(now) {
 
   // Draw particles
   drawParticles(dt);
+
+  // Draw virtual stick UI (touch)
+  drawVirtualStickOverlay();
 
   requestAnimationFrame(loop);
 }
