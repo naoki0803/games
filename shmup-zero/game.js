@@ -46,6 +46,16 @@ const highScoreEl = document.getElementById('highScoreValue');
 const healthFillEl = document.getElementById('healthFill');
 const finalStatsEl = document.getElementById('finalStats');
 const fireBtn = document.getElementById('fireBtn');
+const pauseSettingsEl = document.getElementById('pauseSettings');
+const settingsFormEl = document.getElementById('settingsForm');
+const controlRelativeInput = document.getElementById('controlRelative');
+const controlFollowInput = document.getElementById('controlFollow');
+const itemAttackInput = document.getElementById('itemAttack');
+const itemCompanionInput = document.getElementById('itemCompanion');
+const itemBarrierInput = document.getElementById('itemBarrier');
+const itemSpeedInput = document.getElementById('itemSpeed');
+const settingsApplyBtn = document.getElementById('settingsApplyBtn');
+const settingsResumeBtn = document.getElementById('settingsResumeBtn');
 // ステージ用モーダル
 const stageModalEl = document.getElementById('stageModal');
 const stageModalTitleEl = document.getElementById('stageModalTitle');
@@ -146,11 +156,119 @@ let input = {
   stickFingerY: 0,
   stickVectorX: 0,
   stickVectorY: 0,
+  followActive: false,
+  followPointerId: null,
+  followTargetX: 0,
+  followTargetY: 0,
 };
 
 const VIRTUAL_STICK_MAX_DISTANCE = 80;
 const VIRTUAL_STICK_DEADZONE = 8;
 const VIRTUAL_STICK_VISUAL_RADIUS = 60;
+
+const ControlModes = {
+  Relative: 'relative',
+  FollowTouch: 'follow',
+};
+const SETTINGS_STORAGE_KEY = 'shmupZeroSettings';
+
+function createDefaultSettings() {
+  return {
+    controlMode: ControlModes.Relative,
+    items: {
+      attack: false,
+      companion: false,
+      barrier: false,
+      speed: false,
+    },
+  };
+}
+
+function loadUserSettings() {
+  const defaults = createDefaultSettings();
+  try {
+    const raw = localStorage.getItem(SETTINGS_STORAGE_KEY);
+    if (!raw) return defaults;
+    const parsed = JSON.parse(raw);
+    if (parsed && typeof parsed === 'object') {
+      if (parsed.controlMode === ControlModes.FollowTouch) {
+        defaults.controlMode = ControlModes.FollowTouch;
+      }
+      if (parsed.items && typeof parsed.items === 'object') {
+        for (const key of Object.keys(defaults.items)) {
+          if (typeof parsed.items[key] === 'boolean') {
+            defaults.items[key] = parsed.items[key];
+          }
+        }
+      }
+    }
+  } catch (err) {
+    // 読み込み失敗時はデフォルトを使用
+  }
+  return defaults;
+}
+
+function saveUserSettings() {
+  try {
+    localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(userSettings));
+  } catch (err) {
+    // 保存できない場合は黙って失敗
+  }
+}
+
+let userSettings = loadUserSettings();
+let controlMode = userSettings.controlMode || ControlModes.Relative;
+
+function setControlMode(mode) {
+  controlMode = mode === ControlModes.FollowTouch ? ControlModes.FollowTouch : ControlModes.Relative;
+  if (controlMode === ControlModes.Relative) {
+    resetFollowMode();
+  } else {
+    resetVirtualStick();
+  }
+}
+
+function setAttackState(enabled) {
+  player.shotPowerLevel = enabled ? (MAX_SHOT_LINES - 1) : 0;
+  if (!enabled) {
+    player.extraShotLevelsFromCompanion = 0;
+  }
+}
+
+function setCompanionState(enabled) {
+  companions.length = 0;
+  player.extraShotLevelsFromCompanion = 0;
+  if (enabled) {
+    const offsets = [-COMPANION_OFFSET_Y, COMPANION_OFFSET_Y];
+    for (let i = 0; i < Math.min(MAX_COMPANIONS, offsets.length); i++) {
+      companions.push({ offsetY: offsets[i], fireCooldown: 0 });
+    }
+  }
+}
+
+function setBarrierState(enabled) {
+  player.shieldCharges = enabled ? player.maxShieldCharges : 0;
+}
+
+function setSpeedState(enabled) {
+  if (enabled) {
+    player.speedBoostMultiplier = 1.6;
+    player.speedBoostTimer = Infinity;
+  } else {
+    player.speedBoostMultiplier = 1;
+    player.speedBoostTimer = 0;
+  }
+}
+
+function applyItemSettingsFromUser() {
+  const items = userSettings.items || {};
+  setCompanionState(!!items.companion);
+  setAttackState(!!items.attack);
+  setBarrierState(!!items.barrier);
+  setSpeedState(!!items.speed);
+}
+
+setControlMode(controlMode);
 
 // Utilities
 function clamp(v, a, b) { return Math.max(a, Math.min(b, v)); }
@@ -483,8 +601,71 @@ function resetVirtualStick() {
   input.stickVectorY = 0;
 }
 
+function resetFollowMode() {
+  input.followActive = false;
+  input.followPointerId = null;
+}
+
+function movePlayerTowardsFollowTarget(dt, immediate = false) {
+  if (!input.followActive) return;
+  const w = canvas.width / renderScale;
+  const h = canvas.height / renderScale;
+  const targetX = clamp(input.followTargetX, 16, w - 16);
+  const targetY = clamp(input.followTargetY, 16, h - 16);
+  if (immediate) {
+    player.x = targetX;
+    player.y = targetY;
+    return;
+  }
+  const dx = targetX - player.x;
+  const dy = targetY - player.y;
+  const dist = Math.hypot(dx, dy);
+  if (dist < 0.5) {
+    player.x = targetX;
+    player.y = targetY;
+    return;
+  }
+  const followSpeed = player.speed * (player.speedBoostMultiplier || 1) * 1.2;
+  const maxStep = followSpeed * dt;
+  if (maxStep <= 0) return;
+  if (maxStep >= dist) {
+    player.x = targetX;
+    player.y = targetY;
+  } else {
+    const inv = 1 / dist;
+    player.x += dx * inv * maxStep;
+    player.y += dy * inv * maxStep;
+  }
+}
+
+function handleFollowPointerDown(e) {
+  if (input.followActive && input.followPointerId !== e.pointerId) return;
+  e.preventDefault();
+  const rect = canvas.getBoundingClientRect();
+  const px = e.clientX - rect.left;
+  const py = e.clientY - rect.top;
+  input.followActive = true;
+  input.followPointerId = e.pointerId;
+  input.followTargetX = px;
+  input.followTargetY = py;
+  try { canvas.setPointerCapture(e.pointerId); } catch (err) { /* noop */ }
+  movePlayerTowardsFollowTarget(0, true);
+}
+
+function handleFollowPointerMove(e) {
+  if (!input.followActive || e.pointerId !== input.followPointerId) return;
+  e.preventDefault();
+  const rect = canvas.getBoundingClientRect();
+  input.followTargetX = e.clientX - rect.left;
+  input.followTargetY = e.clientY - rect.top;
+}
+
 canvas.addEventListener('pointerdown', (e) => {
   if (e.pointerType === 'mouse' && e.button !== 0) return;
+  if (controlMode === ControlModes.FollowTouch) {
+    handleFollowPointerDown(e);
+    return;
+  }
   if (input.stickActive && input.stickPointerId !== e.pointerId) return;
   e.preventDefault();
   const rect = canvas.getBoundingClientRect();
@@ -504,6 +685,10 @@ canvas.addEventListener('pointerdown', (e) => {
 });
 
 window.addEventListener('pointermove', (e) => {
+  if (controlMode === ControlModes.FollowTouch) {
+    handleFollowPointerMove(e);
+    return;
+  }
   if (!input.stickActive || e.pointerId !== input.stickPointerId) return;
   e.preventDefault();
   const rect = canvas.getBoundingClientRect();
@@ -534,6 +719,13 @@ window.addEventListener('pointermove', (e) => {
 });
 
 function handlePointerRelease(e) {
+  if (controlMode === ControlModes.FollowTouch) {
+    if (e.pointerId !== input.followPointerId) return;
+    e.preventDefault();
+    try { canvas.releasePointerCapture(e.pointerId); } catch (err) { /* noop */ }
+    resetFollowMode();
+    return;
+  }
   if (e.pointerId !== input.stickPointerId) return;
   e.preventDefault();
   try { canvas.releasePointerCapture(e.pointerId); } catch (err) { /* noop */ }
@@ -543,9 +735,66 @@ function handlePointerRelease(e) {
 window.addEventListener('pointerup', handlePointerRelease);
 window.addEventListener('pointercancel', handlePointerRelease);
 canvas.addEventListener('lostpointercapture', (e) => {
-  if (e.pointerId !== input.stickPointerId) return;
-  resetVirtualStick();
+  if (controlMode === ControlModes.FollowTouch) {
+    if (e.pointerId !== input.followPointerId) return;
+    resetFollowMode();
+  } else {
+    if (e.pointerId !== input.stickPointerId) return;
+    resetVirtualStick();
+  }
 });
+
+function populateSettingsFormFromGame() {
+  if (!settingsFormEl) return;
+  const isRelative = controlMode === ControlModes.Relative;
+  if (controlRelativeInput) controlRelativeInput.checked = isRelative;
+  if (controlFollowInput) controlFollowInput.checked = !isRelative;
+  if (itemAttackInput) itemAttackInput.checked = (player.shotPowerLevel || 0) > 0;
+  if (itemCompanionInput) itemCompanionInput.checked = companions.length > 0;
+  if (itemBarrierInput) itemBarrierInput.checked = (player.shieldCharges || 0) > 0;
+  if (itemSpeedInput) itemSpeedInput.checked = (player.speedBoostMultiplier || 1) > 1;
+}
+
+function updateSettingsFromForm() {
+  if (!settingsFormEl) return;
+  const nextControl = (controlFollowInput && controlFollowInput.checked) ? ControlModes.FollowTouch : ControlModes.Relative;
+  userSettings.controlMode = nextControl;
+  if (!userSettings.items) userSettings.items = createDefaultSettings().items;
+  if (itemAttackInput) userSettings.items.attack = !!itemAttackInput.checked;
+  if (itemCompanionInput) userSettings.items.companion = !!itemCompanionInput.checked;
+  if (itemBarrierInput) userSettings.items.barrier = !!itemBarrierInput.checked;
+  if (itemSpeedInput) userSettings.items.speed = !!itemSpeedInput.checked;
+  saveUserSettings();
+  setControlMode(userSettings.controlMode);
+  applyItemSettingsFromUser();
+}
+
+function showPauseSettings() {
+  if (!pauseSettingsEl) return;
+  populateSettingsFormFromGame();
+  pauseSettingsEl.classList.remove('hidden');
+  if (controlMode === ControlModes.Relative) {
+    controlRelativeInput?.focus();
+  } else {
+    controlFollowInput?.focus();
+  }
+}
+
+function hidePauseSettings() {
+  if (!pauseSettingsEl) return;
+  pauseSettingsEl.classList.add('hidden');
+}
+
+function resumeGameFromPause() {
+  if (stageModalEl && !stageModalEl.classList.contains('hidden')) return;
+  hidePauseSettings();
+  if (gameState === State.Paused) {
+    gameState = State.Playing;
+    if (pauseBtn) pauseBtn.textContent = '⏸';
+    lastTime = performance.now();
+    requestAnimationFrame(loop);
+  }
+}
 
 startBtn.addEventListener('click', () => startGame());
 restartBtn.addEventListener('click', () => startGame());
@@ -569,13 +818,32 @@ if (fireBtn) {
   window.addEventListener('mouseup', stopShooting);
 }
 
+if (settingsFormEl) {
+  settingsFormEl.addEventListener('submit', (e) => e.preventDefault());
+}
+if (settingsApplyBtn) {
+  settingsApplyBtn.addEventListener('click', () => {
+    updateSettingsFromForm();
+    resumeGameFromPause();
+  });
+}
+if (settingsResumeBtn) {
+  settingsResumeBtn.addEventListener('click', () => {
+    resumeGameFromPause();
+  });
+}
+
 function togglePause() {
   if (gameState === State.Playing) {
-    gameState = State.Paused; pauseBtn.textContent = '▶';
+    if (stageModalEl && !stageModalEl.classList.contains('hidden')) return;
+    gameState = State.Paused;
+    if (pauseBtn) pauseBtn.textContent = '▶';
+    showPauseSettings();
   } else if (gameState === State.Paused) {
-    gameState = State.Playing; pauseBtn.textContent = '⏸';
-    lastTime = performance.now();
-    requestAnimationFrame(loop);
+    if (pauseSettingsEl && !pauseSettingsEl.classList.contains('hidden')) {
+      updateSettingsFromForm();
+    }
+    resumeGameFromPause();
   }
 }
 
@@ -616,13 +884,16 @@ function resetGame({ stage = 1, scoreOverride = null } = {}) {
   // ボス状態を初期化
   boss = null;
   bossActive = false;
-  bossSpawnedForStage[1] = bossSpawnedForStage[2] = bossSpawnedForStage[3] = bossSpawnedForStage[4] = bossSpawnedForStage[5] = false;
-  if (bossHudEl) bossHudEl.classList.add('hidden');
-  overlayEl.classList.add('hidden');
-  restartBtn.classList.add('hidden');
-  if (resumeStageBtn) resumeStageBtn.classList.add('hidden');
-  if (finalStatsEl) finalStatsEl.classList.add('hidden');
-  input.shoot = AUTO_FIRE;
+    bossSpawnedForStage[1] = bossSpawnedForStage[2] = bossSpawnedForStage[3] = bossSpawnedForStage[4] = bossSpawnedForStage[5] = false;
+    if (bossHudEl) bossHudEl.classList.add('hidden');
+    overlayEl.classList.add('hidden');
+    restartBtn.classList.add('hidden');
+    if (resumeStageBtn) resumeStageBtn.classList.add('hidden');
+    if (finalStatsEl) finalStatsEl.classList.add('hidden');
+    hidePauseSettings();
+    setControlMode(userSettings.controlMode);
+    applyItemSettingsFromUser();
+    input.shoot = AUTO_FIRE;
   healthFillEl.style.width = '100%';
   scoreEl.textContent = score.toString();
 }
@@ -1139,7 +1410,7 @@ function drawCompanion(x, y) {
 }
 
 function drawVirtualStickOverlay() {
-  if (!input.stickActive) return;
+  if (controlMode === ControlModes.FollowTouch || !input.stickActive) return;
   ctx.save();
   ctx.lineWidth = 2.5;
   ctx.strokeStyle = 'rgba(255,255,255,0.25)';
@@ -1228,32 +1499,35 @@ function loop(now) {
   // Clear
   ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-  // Background
-  drawStars(dt);
+    // Background
+    drawStars(dt);
 
-  // Player input movement
-  if (player.speedBoostTimer > 0) {
-    player.speedBoostTimer -= dt;
-    if (player.speedBoostTimer <= 0) {
-      player.speedBoostTimer = 0;
-      player.speedBoostMultiplier = 1;
+    // Player input movement
+    if (player.speedBoostTimer > 0) {
+      player.speedBoostTimer -= dt;
+      if (player.speedBoostTimer <= 0) {
+        player.speedBoostTimer = 0;
+        player.speedBoostMultiplier = 1;
+      }
     }
-  }
-  const moveSpeed = player.speed * (player.speedBoostMultiplier || 1);
-  let mvx = (input.right ? 1 : 0) - (input.left ? 1 : 0);
-  let mvy = (input.down ? 1 : 0) - (input.up ? 1 : 0);
-  if (input.stickActive) {
-    mvx += input.stickVectorX;
-    mvy += input.stickVectorY;
-  }
-  const moveLen = Math.hypot(mvx, mvy);
-  if (moveLen > 0.001) {
-    const normX = mvx / moveLen;
-    const normY = mvy / moveLen;
-    const cappedLen = Math.min(moveLen, 1);
-    player.x += normX * cappedLen * moveSpeed * dt;
-    player.y += normY * cappedLen * moveSpeed * dt;
-  }
+    const moveSpeed = player.speed * (player.speedBoostMultiplier || 1);
+    let mvx = (input.right ? 1 : 0) - (input.left ? 1 : 0);
+    let mvy = (input.down ? 1 : 0) - (input.up ? 1 : 0);
+    if (controlMode === ControlModes.Relative && input.stickActive) {
+      mvx += input.stickVectorX;
+      mvy += input.stickVectorY;
+    }
+    const moveLen = Math.hypot(mvx, mvy);
+    if (moveLen > 0.001) {
+      const normX = mvx / moveLen;
+      const normY = mvy / moveLen;
+      const cappedLen = Math.min(moveLen, 1);
+      player.x += normX * cappedLen * moveSpeed * dt;
+      player.y += normY * cappedLen * moveSpeed * dt;
+    }
+    if (controlMode === ControlModes.FollowTouch && input.followActive) {
+      movePlayerTowardsFollowTarget(dt, false);
+    }
   const w = canvas.width / renderScale;
   const h = canvas.height / renderScale;
   player.x = clamp(player.x, 16, w - 16);
@@ -1609,6 +1883,7 @@ function loop(now) {
 
 function endGame() {
   gameState = State.GameOver;
+  hidePauseSettings();
   overlayEl.classList.remove('hidden');
   restartBtn.classList.remove('hidden');
   continueStage = currentStage;
@@ -1634,6 +1909,7 @@ function showStageClearModal(clearedStage) {
   if (!stageModalEl || !stageModalTitleEl) return;
   stageModalTitleEl.textContent = `ステージ${clearedStage}クリア！`;
   stageModalEl.classList.remove('hidden');
+  hidePauseSettings();
   gameState = State.Paused;
   pauseBtn.textContent = '▶';
 }
