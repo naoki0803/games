@@ -527,12 +527,9 @@ window.addEventListener('pointermove', (e) => {
     input.stickVectorX = 0;
     input.stickVectorY = 0;
   } else {
-    const effectiveDistance = Math.min(distance, VIRTUAL_STICK_MAX_DISTANCE);
-    const denominator = Math.max(1, VIRTUAL_STICK_MAX_DISTANCE - VIRTUAL_STICK_DEADZONE);
-    const strength = Math.max(0, Math.min(1, (effectiveDistance - VIRTUAL_STICK_DEADZONE) / denominator));
     const inv = 1 / distance;
-    input.stickVectorX = dx * inv * strength;
-    input.stickVectorY = dy * inv * strength;
+    input.stickVectorX = dx * inv;
+    input.stickVectorY = dy * inv;
   }
 });
 
