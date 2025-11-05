@@ -48,6 +48,54 @@
         <!-- モバイル発射ボタン（右下固定） -->
         <button id="fireBtn" class="btn fire-btn" aria-label="発射">🚀 発射</button>
 
+          <!-- ポーズ設定オーバーレイ -->
+          <div id="pauseSettings" class="overlay hidden" role="dialog" aria-modal="true" aria-labelledby="pauseSettingsTitle">
+            <div class="panel settings-panel">
+              <h2 id="pauseSettingsTitle" class="title">ポーズ設定</h2>
+              <form id="settingsForm" class="settings-form">
+                <fieldset class="settings-group">
+                  <legend>操作タイプ</legend>
+                  <div class="settings-options settings-modes">
+                    <label class="settings-option" for="controlRelative">
+                      <input type="radio" name="controlMode" id="controlRelative" value="relative" />
+                      <span>バーチャルスティック（現行の操作）</span>
+                    </label>
+                    <label class="settings-option" for="controlFollow">
+                      <input type="radio" name="controlMode" id="controlFollow" value="follow" />
+                      <span>指に合わせて機体が追従（以前の操作）</span>
+                    </label>
+                  </div>
+                </fieldset>
+
+                <fieldset class="settings-group">
+                  <legend>アイテム獲得状態</legend>
+                  <div class="settings-options settings-items">
+                    <label class="settings-option" for="itemAttack">
+                      <input type="checkbox" id="itemAttack" />
+                      <span>攻撃強化（パワーアップ）</span>
+                    </label>
+                    <label class="settings-option" for="itemCompanion">
+                      <input type="checkbox" id="itemCompanion" />
+                      <span>子機サポート</span>
+                    </label>
+                    <label class="settings-option" for="itemBarrier">
+                      <input type="checkbox" id="itemBarrier" />
+                      <span>バリア（シールド）</span>
+                    </label>
+                    <label class="settings-option" for="itemSpeed">
+                      <input type="checkbox" id="itemSpeed" />
+                      <span>スピードアップ</span>
+                    </label>
+                  </div>
+                </fieldset>
+              </form>
+              <div class="controls settings-controls">
+                <button id="settingsApplyBtn" type="button" class="btn primary">設定を反映して再開</button>
+                <button id="settingsResumeBtn" type="button" class="btn">変更せずに再開</button>
+              </div>
+            </div>
+          </div>
+
         <div id="overlay" class="overlay hidden">
           <div class="panel">
             <h1 class="title">Shmup Zero</h1>
